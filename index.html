@@ -4686,26 +4686,84 @@ window.addEventListener('beforeunload', function() {
 	window.respondPoke = respondPoke;
 	
     function showFullRecordPreview(rec) {
-        let modal = document.createElement("div"); modal.className = "modal-overlay";
-        let equipHtml = rec.equipmentDetails?.map(e => `<tr><td style="border:1px solid #ddd; padding:8px;">${e.assetNumber || '-'}</td><td style="border:1px solid #ddd; padding:8px;">${e.assetDesc}</td><td style="border:1px solid #ddd; padding:8px;">${e.manufacturer}</td><td style="border:1px solid #ddd; padding:8px;">${e.serialNo || '-'}</td></tr>`).join('') || '<tr><td colspan="4">No details</td></tr>';
-        
-		// Create filename for PDF
-    	var purposeSafe = (rec.purpose || 'record').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
-    	var dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    	var pdfFilename = `record_preview_${purposeSafe}_${dateStr}`;
-		
-		let win = window.open('', '_blank');
-        win.document.write(`<html><head><title>Record_Preview</title><style>body{font-family:'Segoe UI',sans-serif; padding:30px;} .header{background:linear-gradient(135deg,#0a2e3f,#166b5c); color:white; padding:20px; border-radius:16px;} .grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; background:#f8fafc; padding:20px; border-radius:16px; margin:15px 0;} .badge{display:inline-block; padding:4px 12px; border-radius:50px;} .in{background:#00a86b; color:white;} .out{background:#dc3545; color:white;} table{border-collapse:collapse; width:100%;} th,td{border:1px solid #ddd; padding:8px;}</style></head><body>
-            <div class="header"><h3>Transaction Record Preview</h3><p>${formatTimestamp(rec.displayTime)}</p></div>
-            <div class="grid"><div><strong>Status:</strong><br><span class="badge ${rec.status==='IN'?'in':'out'}">${rec.status}</span></div><div><strong>Job Type:</strong><br>${rec.jobType||'-'}</div><div><strong>Purpose:</strong><br>${rec.purpose||'-'}</div><div><strong>ET/SET/Phy:</strong><br>${rec.et}/${rec.set}/${rec.physicist}</div><div><strong>Remarks:</strong><br>${rec.remarks||'-'}</div><div><strong>Record Status:</strong><br>${rec.recordStatus}</div></div>
-            <h4>Equipment List</h4><table><thead><tr><th>Asset #</th><th>Description</th><th>Manufacturer</th><th>Serial #</th></tr></thead><tbody>${equipHtml}</tbody></table>
-            ${rec.editHistory?.length ? `<div style="background:#fef9e6; padding:15px; border-radius:12px; margin-top:20px;"><h4>Edit History</h4>${rec.editHistory.map(h => `<div>${h.timestamp} | ${h.user}: ${h.reason}</div>`).join('')}</div>` : ''}
-            <div style="margin-top:20px;"><strong>Signature:</strong><br><img src="${rec.signature}" style="max-width:200px; border:1px solid #ddd; border-radius:8px;"></div>
-        </body></html>`);
-        win.document.close(); win.print();
-        modal.querySelector(".close-modal")?.onclick?.();
-    }
-
+	    let modal = document.createElement("div"); 
+	    modal.className = "modal-overlay";
+	    
+	    let equipHtml = rec.equipmentDetails?.map(e => `
+	        <tr>
+	            <td style="border:1px solid #ddd; padding:8px;">${e.assetNumber || '-'}</td>
+	            <td style="border:1px solid #ddd; padding:8px;">${e.assetDesc}</td>
+	            <td style="border:1px solid #ddd; padding:8px;">${e.manufacturer || '-'}</td>
+	            <td style="border:1px solid #ddd; padding:8px;">${e.serialNo || '-'}</td>
+	        </tr>
+	    `).join('') || '<tr><td colspan="4">No details</td></tr>';
+	    
+	    // Create filename for PDF
+	    var purposeSafe = (rec.purpose || 'record').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
+	    var dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+	    var pdfFilename = `record_preview_${purposeSafe}_${dateStr}`;
+	    
+	    let win = window.open('', '_blank');
+	    win.document.write(`
+	        <html>
+	        <head>
+	            <title>Record_Preview</title>
+	            <style>
+	                body{font-family:'Segoe UI',sans-serif; padding:30px;}
+	                .header{background:linear-gradient(135deg,#0a2e3f,#166b5c); color:white; padding:20px; border-radius:16px;}
+	                .grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; background:#f8fafc; padding:20px; border-radius:16px; margin:15px 0;}
+	                .badge{display:inline-block; padding:4px 12px; border-radius:50px;}
+	                .in{background:#00a86b; color:white;}
+	                .out{background:#dc3545; color:white;}
+	                table{border-collapse:collapse; width:100%;}
+	                th,td{border:1px solid #ddd; padding:8px;}
+	                .signature-name{font-weight:bold; color:#166b5c; font-size:1.1rem; margin-top:8px; display:inline-block;}
+	            </style>
+	        </head>
+	        <body>
+	            <div class="header">
+	                <h3>Transaction Record Preview</h3>
+	                <p>${formatTimestamp(rec.displayTime)}</p>
+	            </div>
+	            <div class="grid">
+	                <div><strong>Status:</strong><br><span class="badge ${rec.status==='IN'?'in':'out'}">${rec.status}</span></div>
+	                <div><strong>Job Type:</strong><br>${rec.jobType||'-'}</div>
+	                <div><strong>Purpose:</strong><br>${rec.purpose||'-'}</div>
+	                <div><strong>ET/SET/Phy:</strong><br>${rec.et}/${rec.set}/${rec.physicist}</div>
+	                <div><strong>Remarks:</strong><br>${rec.remarks||'-'}</div>
+	                <div><strong>Record Status:</strong><br>${rec.recordStatus}</div>
+	            </div>
+	            <h4>Equipment List</h4>
+	            <table>
+	                <thead>
+	                    <tr><th>Asset #</th><th>Description</th><th>Manufacturer</th><th>Serial #</th></tr>
+	                </thead>
+	                <tbody>${equipHtml}</tbody>
+	            </table>
+	            ${rec.editHistory?.length ? `
+	            <div style="background:#fef9e6; padding:15px; border-radius:12px; margin-top:20px;">
+	                <h4>Edit History</h4>
+	                ${rec.editHistory.map(h => `<div>${h.timestamp} | ${h.user}: ${h.reason}</div>`).join('')}
+	            </div>` : ''}
+	            
+	            <!-- Updated Signature Section -->
+	            <div style="margin-top:20px; padding-top:15px; border-top:2px solid #e8edf2;">
+	                <strong style="font-size:1rem;">Certificated Sr. Electrical Technician:</strong>
+	                <br>
+	                <img src="${rec.signature}" style="max-width:200px; border:1px solid #ddd; border-radius:8px; margin-top:8px;">
+	                <br>
+	                <span class="signature-name">Reeve WOO</span>
+	            </div>
+	            <!-- End Signature Section -->
+	            
+	        </body>
+	        </html>
+	    `);
+	    win.document.close(); 
+	    win.print();
+	    modal.querySelector(".close-modal")?.onclick?.();
+	}
+	
     async function emailRecordPreview(rec) {
 	    try {
 	        // Generate PDF preview HTML content
@@ -4923,10 +4981,12 @@ window.addEventListener('beforeunload', function() {
 			                <h4>Edit History</h4>
 			                ${rec.editHistory.map(h => `<div>${h.timestamp} | ${h.user}: ${h.reason}</div>`).join('')}
 			            </div>` : ''}
-			            <div style="margin-top:20px; text-align:left;">
-						    <strong>Certificated Sr. Electrical Technician:</strong><br>
-						    <img src="${rec.signature}" style="max-width:200px; border:1px solid #ddd; border-radius:8px;">
-						    <div style="margin-top:5px; font-weight:bold; color:#166b5c; font-size:1.1rem;">Reeve WOO</div>
+			            <div style="margin-top:20px; text-align:left; padding-top:15px; border-top:2px solid #e8edf2;">
+						    <strong style="font-size:1rem;">Certificated Sr. Electrical Technician:</strong>
+						    <br>
+						    <img src="${rec.signature}" style="max-width:200px; border:1px solid #ddd; border-radius:8px; margin-top:8px;">
+						    <br>
+						    <span style="font-weight:bold; color:#166b5c; font-size:1.1rem; margin-top:8px; display:inline-block;">Reeve WOO</span>
 						</div>
 			            <div style="margin-top:30px; text-align:center; font-size:0.8rem; color:#666; border-top:1px solid #ddd; padding-top:20px;">
 			                <p>Generated from: ${window.location.href}</p>
