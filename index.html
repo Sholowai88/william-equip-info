@@ -520,8 +520,12 @@
                 <div class="form-group"><label>🧪 Physicist *</label><select id="phySelect"><option value="">--Select--</option><option value="Xiao Li">Xiao Li</option><option value="Celina">Celina</option><option value="Keith">Keith</option><option value="Jacky">Jacky</option><option value="Martin">Martin</option><option value="RT Phy.">RT Phy.</option><option value="N/A">N/A</option></select></div>
                 <div class="form-group"><label>📝 Others</label><input type="text" id="othersNames" placeholder="Deputizing name etc."></div>
                 <div class="form-group"><label>💬 Remarks</label><input type="text" id="remarksField" placeholder="Additional remarks"></div></div>
-            <div><label>✍️ Signature *</label><canvas id="signatureCanvas" width="400" height="100"></canvas><div><button id="clearSignatureBtn" class="btn btn-sm">Clear Signature</button></div></div>
-            <div style="display: flex; gap: 12px; margin-top: 16px;"><button id="previewRecordBtn" class="btn btn-primary">🔍 Preview</button><button id="saveRecordBtn" class="btn btn-primary">💾 Save Record</button><button id="clearFormBtnRecord" class="btn">🗑️ Clear</button></div>
+            <div>
+			    <label style="font-weight:600; font-size:0.85rem;">✍️ Certificated Sr. Electrical Technician: <span style="font-size:1.1rem; font-weight:bold; color:#166b5c;">Reeve WOO</span></label>
+			    <canvas id="signatureCanvas" width="400" height="100"></canvas>
+			    <div><button id="clearSignatureBtn" class="btn btn-sm">Clear Signature</button></div>
+			</div>
+			<div style="display: flex; gap: 12px; margin-top: 16px;"><button id="previewRecordBtn" class="btn btn-primary">🔍 Preview</button><button id="saveRecordBtn" class="btn btn-primary">💾 Save Record</button><button id="clearFormBtnRecord" class="btn">🗑️ Clear</button></div>
         </div>
         <div style="background:#f9fbfe; border-radius:20px; padding:16px; margin-top:16px;"><h4>📌 Selected Equipment</h4><div id="selectedEquipList" style="font-size:0.7rem; max-height:120px; overflow-y:auto;"></div></div>
     </div>
@@ -3756,9 +3760,39 @@ window.addEventListener('beforeunload', function() {
 	}
     
     const canvas = document.getElementById("signatureCanvas"), ctx = canvas.getContext("2d"); let drawing = false;
-    function initCanvas() { canvas.width = 400; canvas.height = 100; ctx.fillStyle = "white"; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.strokeStyle = "#166b5c"; ctx.lineWidth = 2; }
-    function clearCanvas() { ctx.fillStyle = "white"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
-    function getXY(e) { let rect = canvas.getBoundingClientRect(), sx = canvas.width / rect.width, sy = canvas.height / rect.height; let cx = (e.touches ? e.touches[0].clientX : e.clientX), cy = (e.touches ? e.touches[0].clientY : e.clientY); return { x: (cx - rect.left) * sx, y: (cy - rect.top) * sy }; }
+    function initCanvas() { 
+	    canvas.width = 400; 
+	    canvas.height = 100; 
+	    ctx.fillStyle = "white"; 
+	    ctx.fillRect(0, 0, canvas.width, canvas.height); 
+	    ctx.strokeStyle = "#166b5c"; 
+	    ctx.lineWidth = 2;
+	    
+	    // Auto-draw "Reeve WOO" on the canvas
+	    drawSignatureName();
+	}
+	function drawSignatureName() {
+	    ctx.fillStyle = "#166b5c";
+	    ctx.font = "bold 28px 'Segoe UI', 'Brush Script MT', cursive";
+	    ctx.textAlign = "center";
+	    ctx.textBaseline = "middle";
+	    ctx.fillText("Reeve WOO", canvas.width / 2, canvas.height / 2);
+	    
+	    // Add a subtle underline
+	    ctx.strokeStyle = "#166b5c";
+	    ctx.lineWidth = 2;
+	    ctx.beginPath();
+	    ctx.moveTo(canvas.width / 2 - 80, canvas.height / 2 + 25);
+	    ctx.lineTo(canvas.width / 2 + 80, canvas.height / 2 + 25);
+	    ctx.stroke();
+	}
+	function clearCanvas() { 
+	    ctx.fillStyle = "white"; 
+	    ctx.fillRect(0, 0, canvas.width, canvas.height);
+	    // Redraw the signature name after clearing
+	    drawSignatureName();
+	}
+	function getXY(e) { let rect = canvas.getBoundingClientRect(), sx = canvas.width / rect.width, sy = canvas.height / rect.height; let cx = (e.touches ? e.touches[0].clientX : e.clientX), cy = (e.touches ? e.touches[0].clientY : e.clientY); return { x: (cx - rect.left) * sx, y: (cy - rect.top) * sy }; }
     function startDraw(e) { drawing = true; let { x, y } = getXY(e); ctx.beginPath(); ctx.moveTo(x, y); e.preventDefault(); }
     function drawMove(e) { if (!drawing) return; let { x, y } = getXY(e); ctx.lineTo(x, y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y); e.preventDefault(); }
     function endDraw() { drawing = false; ctx.beginPath(); }
@@ -3802,7 +3836,8 @@ window.addEventListener('beforeunload', function() {
     	var phy = document.getElementById("phySelect").value;
     	var others = document.getElementById("othersNames").value.trim();
     	var remarks = document.getElementById("remarksField").value.trim();
-    	var signature = canvas.toDataURL();
+    	// Get the signature from canvas and overlay the name if needed
+		var signature = canvas.toDataURL();
     	var selectedEquips = equipmentData.filter(function(eq) { return selectedAssetsSet.has(getKey(eq)); });
     	var equipDetails = selectedEquips.map(function(eq) { 
         	return { 
@@ -4889,9 +4924,10 @@ window.addEventListener('beforeunload', function() {
 			                ${rec.editHistory.map(h => `<div>${h.timestamp} | ${h.user}: ${h.reason}</div>`).join('')}
 			            </div>` : ''}
 			            <div style="margin-top:20px; text-align:left;">
-			                <strong>Signature:</strong><br>
-			                <img src="${rec.signature}" style="max-width:200px; border:1px solid #ddd; border-radius:8px;">
-			            </div>
+						    <strong>Certificated Sr. Electrical Technician:</strong><br>
+						    <img src="${rec.signature}" style="max-width:200px; border:1px solid #ddd; border-radius:8px;">
+						    <div style="margin-top:5px; font-weight:bold; color:#166b5c; font-size:1.1rem;">Reeve WOO</div>
+						</div>
 			            <div style="margin-top:30px; text-align:center; font-size:0.8rem; color:#666; border-top:1px solid #ddd; padding-top:20px;">
 			                <p>Generated from: ${window.location.href}</p>
 			            </div>
@@ -5599,20 +5635,22 @@ window.addEventListener('beforeunload', function() {
         document.getElementById("clearFormBtnRecord").onclick = () => { document.getElementById("jobType").value = ""; document.getElementById("purposeInput").value = ""; document.getElementById("othersNames").value = ""; document.getElementById("remarksField").value = ""; Array.from(document.getElementById("etSelect").options).forEach(o => o.selected = false); document.getElementById("setSelect").selectedIndex = 0; document.getElementById("phySelect").selectedIndex = 0; clearCanvas(); setToday(); };
         document.getElementById("clearSignatureBtn").onclick = clearCanvas;
         document.getElementById("previewRecordBtn").onclick = () => {
-            let selected = equipmentData.filter(eq => selectedAssetsSet.has(getKey(eq)));
-            if (selected.length === 0) { alert("No equipment selected."); return; }
-            let modal = document.createElement("div"); modal.className = "modal-overlay";
-            modal.innerHTML = `<div class="modal-card"><button class="close-modal">✖</button><h3>🔍 Transaction Preview</h3>
-                <div style="background:linear-gradient(135deg,#e8f4f0,white); padding:20px; border-radius:16px;"><div style="display:grid; grid-template-columns:repeat(2,1fr); gap:12px;">
-                    <div><strong>Date/Time:</strong><br>${document.getElementById("recordDatetime").value}</div><div><strong>Status:</strong><br>${document.getElementById("inOutStatus").value}</div>
-                    <div><strong>Job Type:</strong><br>${document.getElementById("jobType").value}</div><div><strong>Purpose:</strong><br>${document.getElementById("purposeInput").value}</div>
-                    <div><strong>ET/SET/Phy:</strong><br>${[...document.getElementById("etSelect").selectedOptions].map(o => o.value).join(',')}/${document.getElementById("setSelect").value}/${document.getElementById("phySelect").value}</div>
-                    <div><strong>Remarks:</strong><br>${document.getElementById("remarksField").value}</div></div></div>
-                <h4>Selected Equipment (${selected.length})</h4><ul style="max-height:200px; overflow-y:auto; background:#f8fafc; padding:12px; border-radius:8px;">${selected.map(e => `<li><strong>${e.assetNumber || e.assetDesc}</strong> - ${e.assetDesc}</li>`).join('')}</ul>
-                <div><strong>Signature:</strong><br><img src="${canvas.toDataURL()}" style="max-width:100%; max-height:100px; border:1px solid #ddd; border-radius:8px; margin-top:8px;"></div>
-            </div>`;
-            document.body.appendChild(modal); modal.querySelector(".close-modal").onclick = () => modal.remove();
-        };
+		    let selected = equipmentData.filter(eq => selectedAssetsSet.has(getKey(eq)));
+		    if (selected.length === 0) { alert("No equipment selected."); return; }
+		    let modal = document.createElement("div"); modal.className = "modal-overlay";
+		    modal.innerHTML = `<div class="modal-card"><button class="close-modal">✖</button><h3>🔍 Transaction Preview</h3>
+		        <div style="background:linear-gradient(135deg,#e8f4f0,white); padding:20px; border-radius:16px;"><div style="display:grid; grid-template-columns:repeat(2,1fr); gap:12px;">
+		            <div><strong>Date/Time:</strong><br>${document.getElementById("recordDatetime").value}</div><div><strong>Status:</strong><br>${document.getElementById("inOutStatus").value}</div>
+		            <div><strong>Job Type:</strong><br>${document.getElementById("jobType").value}</div><div><strong>Purpose:</strong><br>${document.getElementById("purposeInput").value}</div>
+		            <div><strong>ET/SET/Phy:</strong><br>${[...document.getElementById("etSelect").selectedOptions].map(o => o.value).join(',')}/${document.getElementById("setSelect").value}/${document.getElementById("phySelect").value}</div>
+		            <div><strong>Remarks:</strong><br>${document.getElementById("remarksField").value}</div>
+		            <div style="grid-column:span 2;"><strong>Certificated Sr. Electrical Technician:</strong><br><img src="${canvas.toDataURL()}" style="max-width:100%; max-height:100px; border:1px solid #ddd; border-radius:8px; margin-top:8px;"><br><span style="font-weight:bold; color:#166b5c; font-size:1.1rem;">Reeve WOO</span></div>
+		        </div></div>
+		        <h4>Selected Equipment (${selected.length})</h4><ul style="max-height:200px; overflow-y:auto; background:#f8fafc; padding:12px; border-radius:8px;">${selected.map(e => `<li><strong>${e.assetNumber || e.assetDesc}</strong> - ${e.assetDesc}</li>`).join('')}</ul>
+		    </div>`;
+		    document.body.appendChild(modal); 
+		    modal.querySelector(".close-modal").onclick = () => modal.remove();
+		};
         document.getElementById("exportBtn").onclick = exportHistoryCSV;
         document.getElementById("exportDbLogsBtn").onclick = exportDbLogsCSV;
         document.getElementById("backupBtn").onclick = backupToFile;
