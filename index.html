@@ -16,10 +16,10 @@
 	    
 	    // Check if already authenticated
 	    if (sessionStorage.getItem('authenticated') === 'true') {
-	        // Already authenticated, proceed
+	        // Already authenticated, proceed normally
 	        console.log("✅ Already authenticated");
 	    } else {
-	        // Check URL for password parameter
+	        // Check URL for password parameter (for bookmark with password)
 	        var urlParams = new URLSearchParams(window.location.search);
 	        var enteredPassword = urlParams.get('password');
 	        
@@ -28,139 +28,255 @@
 	            window.history.replaceState({}, document.title, window.location.pathname);
 	            console.log("✅ Password correct, authenticated");
 	        } else {
-	            // Show password prompt
-	            console.log("🔒 Password required");
+	            // Password required - prevent page from loading fully
+	            console.log("🔒 Password required - showing overlay");
 	            
-	            // Clear the page and show password form
-	            document.documentElement.innerHTML = '';
+	            // Add overlay styles and create the overlay
+	            var overlayStyles = document.createElement('style');
+	            overlayStyles.textContent = `
+	                /* Password Overlay - Full screen with blur effect */
+	                #passwordOverlay {
+	                    position: fixed;
+	                    top: 0;
+	                    left: 0;
+	                    width: 100%;
+	                    height: 100%;
+	                    background: rgba(0, 0, 0, 0.7);
+	                    backdrop-filter: blur(12px);
+	                    -webkit-backdrop-filter: blur(12px);
+	                    display: flex;
+	                    align-items: center;
+	                    justify-content: center;
+	                    z-index: 999999;
+	                    font-family: 'Segoe UI', sans-serif;
+	                    animation: fadeInOverlay 0.5s ease;
+	                }
+	                @keyframes fadeInOverlay {
+	                    from { opacity: 0; }
+	                    to { opacity: 1; }
+	                }
+	                #passwordOverlay .auth-card {
+	                    background: white;
+	                    padding: 45px 40px 40px 40px;
+	                    border-radius: 28px;
+	                    max-width: 420px;
+	                    width: 90%;
+	                    text-align: center;
+	                    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+	                    animation: slideUp 0.5s ease;
+	                    position: relative;
+	                    overflow: hidden;
+	                }
+	                #passwordOverlay .auth-card::before {
+	                    content: '';
+	                    position: absolute;
+	                    top: 0;
+	                    left: 0;
+	                    right: 0;
+	                    height: 4px;
+	                    background: linear-gradient(90deg, #0a2e3f, #1a5c6e, #0a2e3f);
+	                }
+	                @keyframes slideUp {
+	                    from { transform: translateY(30px); opacity: 0; }
+	                    to { transform: translateY(0); opacity: 1; }
+	                }
+	                #passwordOverlay .auth-icon {
+	                    font-size: 56px;
+	                    margin-bottom: 16px;
+	                    display: block;
+	                }
+	                #passwordOverlay .auth-title {
+	                    color: #0a2e3f;
+	                    font-size: 22px;
+	                    margin-bottom: 6px;
+	                    font-weight: 700;
+	                }
+	                #passwordOverlay .auth-subtitle {
+	                    color: #666;
+	                    font-size: 14px;
+	                    margin-bottom: 25px;
+	                    line-height: 1.5;
+	                }
+	                #passwordOverlay .auth-input {
+	                    width: 100%;
+	                    padding: 14px 18px;
+	                    border: 2px solid #e2e8f0;
+	                    border-radius: 14px;
+	                    font-size: 16px;
+	                    margin-bottom: 15px;
+	                    box-sizing: border-box;
+	                    transition: all 0.3s;
+	                    background: #f8fafc;
+	                }
+	                #passwordOverlay .auth-input:focus {
+	                    outline: none;
+	                    border-color: #1a5c6e;
+	                    box-shadow: 0 0 0 4px rgba(26,92,110,0.1);
+	                    background: white;
+	                }
+	                #passwordOverlay .auth-btn {
+	                    width: 100%;
+	                    padding: 14px;
+	                    background: linear-gradient(135deg, #0a2e3f, #1a5c6e);
+	                    color: white;
+	                    border: none;
+	                    border-radius: 14px;
+	                    font-size: 16px;
+	                    cursor: pointer;
+	                    font-weight: 600;
+	                    transition: all 0.3s;
+	                    letter-spacing: 0.5px;
+	                }
+	                #passwordOverlay .auth-btn:hover {
+	                    transform: translateY(-2px);
+	                    box-shadow: 0 8px 30px rgba(26,92,110,0.35);
+	                }
+	                #passwordOverlay .auth-btn:active {
+	                    transform: scale(0.97);
+	                }
+	                #passwordOverlay .auth-error {
+	                    color: #dc3545;
+	                    font-size: 13px;
+	                    margin-top: 12px;
+	                    display: none;
+	                    padding: 8px 12px;
+	                    background: #ffe0db;
+	                    border-radius: 8px;
+	                }
+	                #passwordOverlay .auth-error.show {
+	                    display: block;
+	                    animation: shake 0.5s ease;
+	                }
+	                @keyframes shake {
+	                    0%, 100% { transform: translateX(0); }
+	                    20% { transform: translateX(-10px); }
+	                    40% { transform: translateX(10px); }
+	                    60% { transform: translateX(-6px); }
+	                    80% { transform: translateX(6px); }
+	                }
+	                #passwordOverlay .auth-hint {
+	                    font-size: 12px;
+	                    color: #999;
+	                    margin-top: 15px;
+	                }
+	                #passwordOverlay .auth-footer {
+	                    margin-top: 18px;
+	                    padding-top: 14px;
+	                    border-top: 1px solid #eee;
+	                    font-size: 11px;
+	                    color: #bbb;
+	                }
+	                #passwordOverlay .lock-icon {
+	                    display: inline-block;
+	                    animation: lockPulse 2s ease-in-out infinite;
+	                }
+	                @keyframes lockPulse {
+	                    0%, 100% { transform: scale(1); }
+	                    50% { transform: scale(1.05); }
+	                }
+	                /* Prevent scrolling while overlay is active */
+	                body.no-scroll {
+	                    overflow: hidden !important;
+	                }
+	                /* Blur the background content */
+	                .page-content-blur {
+	                    filter: blur(8px);
+	                    -webkit-filter: blur(8px);
+	                    pointer-events: none;
+	                    user-select: none;
+	                }
+	            `;
+	            document.head.appendChild(overlayStyles);
 	            
-	            // Create the password form - removed the return statement
-	            var html = `
-	                <!DOCTYPE html>
-	                <html>
-	                <head>
-	                    <meta charset="UTF-8">
-	                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-	                    <title>Password Protected</title>
-	                    <style>
-	                        * { margin: 0; padding: 0; box-sizing: border-box; }
-	                        body { 
-	                            background: linear-gradient(135deg, #0a2e3f, #1a5c6e); 
-	                            min-height: 100vh; 
-	                            display: flex; 
-	                            align-items: center; 
-	                            justify-content: center; 
-	                            font-family: 'Segoe UI', sans-serif;
-	                        }
-	                        .auth-card {
-	                            background: white;
-	                            padding: 50px 40px;
-	                            border-radius: 24px;
-	                            max-width: 420px;
-	                            width: 90%;
-	                            text-align: center;
-	                            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-	                        }
-	                        .auth-icon { font-size: 64px; margin-bottom: 20px; }
-	                        .auth-title { color: #0a2e3f; font-size: 24px; margin-bottom: 8px; }
-	                        .auth-subtitle { color: #666; font-size: 14px; margin-bottom: 25px; }
-	                        .auth-input {
-	                            width: 100%;
-	                            padding: 14px 18px;
-	                            border: 2px solid #e2e8f0;
-	                            border-radius: 12px;
-	                            font-size: 16px;
-	                            margin-bottom: 15px;
-	                            box-sizing: border-box;
-	                            transition: border-color 0.3s;
-	                        }
-	                        .auth-input:focus {
-	                            outline: none;
-	                            border-color: #1a5c6e;
-	                        }
-	                        .auth-btn {
-	                            width: 100%;
-	                            padding: 14px;
-	                            background: linear-gradient(135deg, #0a2e3f, #1a5c6e);
-	                            color: white;
-	                            border: none;
-	                            border-radius: 12px;
-	                            font-size: 16px;
-	                            cursor: pointer;
-	                            font-weight: bold;
-	                            transition: all 0.3s;
-	                        }
-	                        .auth-btn:hover {
-	                            transform: translateY(-2px);
-	                            box-shadow: 0 8px 25px rgba(26,92,110,0.3);
-	                        }
-	                        .auth-error {
-	                            color: #dc3545;
-	                            font-size: 13px;
-	                            margin-top: 12px;
-	                            display: none;
-	                        }
-	                        .auth-hint {
-	                            font-size: 12px;
-	                            color: #999;
-	                            margin-top: 15px;
-	                        }
-	                        .auth-footer {
-	                            margin-top: 20px;
-	                            padding-top: 15px;
-	                            border-top: 1px solid #eee;
-	                            font-size: 11px;
-	                            color: #bbb;
-	                        }
-	                    </style>
-	                </head>
-	                <body>
-	                    <div class="auth-card">
-	                        <div class="auth-icon">🔬⚡</div>
-	                        <h2 class="auth-title">Equipment Database</h2>
-	                        <p class="auth-subtitle">Please enter the password to continue.</p>
-	                        <input type="password" class="auth-input" id="authPassword" placeholder="Enter password..." autocomplete="off">
-	                        <button class="auth-btn" onclick="checkAuthPassword()">🔓 Unlock</button>
-	                        <div class="auth-error" id="authError">❌ Incorrect password. Please try again.</div>
-	                        <div class="auth-hint">Session expires when you close the browser.</div>
-	                        <div class="auth-footer">Protected with password</div>
-	                    </div>
-	
-	                    <script>
-	                        function checkAuthPassword() {
-	                            var input = document.getElementById('authPassword').value;
-	                            var error = document.getElementById('authError');
-	                            var correctPassword = '${SITE_PASSWORD}';
-	                            
-	                            if (input === correctPassword) {
-	                                sessionStorage.setItem('authenticated', 'true');
-	                                location.reload();
-	                            } else {
-	                                error.style.display = 'block';
-	                                setTimeout(function() {
-	                                    error.style.display = 'none';
-	                                }, 3000);
-	                                document.getElementById('authPassword').value = '';
-	                                document.getElementById('authPassword').focus();
-	                            }
-	                        }
-	                        
-	                        document.getElementById('authPassword').addEventListener('keypress', function(e) {
-	                            if (e.key === 'Enter') {
-	                                checkAuthPassword();
-	                            }
-	                        });
-	                        
-	                        setTimeout(function() {
-	                            document.getElementById('authPassword').focus();
-	                        }, 100);
-	                    <\/script>
-	                </body>
-	                </html>
+	            // Add no-scroll class to body
+	            document.body.classList.add('no-scroll');
+	            
+	            // Create the overlay
+	            var overlay = document.createElement('div');
+	            overlay.id = 'passwordOverlay';
+	            overlay.innerHTML = `
+	                <div class="auth-card">
+	                    <span class="auth-icon">🔬⚡</span>
+	                    <h2 class="auth-title">Equipment Database</h2>
+	                    <p class="auth-subtitle">This page is password protected.<br>Please enter the password to continue.</p>
+	                    <input type="password" class="auth-input" id="authPassword" placeholder="Enter password..." autocomplete="off" autofocus>
+	                    <button class="auth-btn" onclick="checkAuthPassword()">🔓 Unlock</button>
+	                    <div class="auth-error" id="authError">❌ Incorrect password. Please try again.</div>
+	                    <div class="auth-hint">🔒 Session expires when you close the browser</div>
+	                    <div class="auth-footer">Protected with password</div>
+	                </div>
 	            `;
 	            
-	            // Write the password form
-	            document.write(html);
+	            // Insert overlay at the beginning of body
+	            document.body.insertBefore(overlay, document.body.firstChild);
+	            
+	            // Add blur class to the main content
+	            var appContainer = document.getElementById('appContainer');
+	            var loginPage = document.getElementById('loginPage');
+	            var aiAssistant = document.getElementById('aiAssistant');
+	            var aiChatWindow = document.getElementById('aiChatWindow');
+	            
+	            if (appContainer) appContainer.classList.add('page-content-blur');
+	            if (loginPage) loginPage.classList.add('page-content-blur');
+	            if (aiAssistant) aiAssistant.style.filter = 'blur(8px)';
+	            if (aiChatWindow) aiChatWindow.style.filter = 'blur(8px)';
+	            
+	            // Also blur all content
+	            var allContent = document.querySelectorAll('.app-container, .login-container, .ai-assistant, .ai-chat-window');
+	            allContent.forEach(function(el) {
+	                el.style.filter = 'blur(8px)';
+	                el.style.pointerEvents = 'none';
+	                el.style.userSelect = 'none';
+	            });
+	            
+	            // Password check function
+	            window.checkAuthPassword = function() {
+	                var input = document.getElementById('authPassword');
+	                var error = document.getElementById('authError');
+	                var password = input.value;
+	                
+	                if (password === SITE_PASSWORD) {
+	                    sessionStorage.setItem('authenticated', 'true');
+	                    // Remove overlay and blur
+	                    var overlayEl = document.getElementById('passwordOverlay');
+	                    if (overlayEl) {
+	                        overlayEl.style.transition = 'opacity 0.5s ease';
+	                        overlayEl.style.opacity = '0';
+	                        setTimeout(function() {
+	                            overlayEl.remove();
+	                            document.body.classList.remove('no-scroll');
+	                            // Remove blur from all elements
+	                            var allElements = document.querySelectorAll('.page-content-blur, .app-container, .login-container, .ai-assistant, .ai-chat-window');
+	                            allElements.forEach(function(el) {
+	                                el.style.filter = '';
+	                                el.style.pointerEvents = '';
+	                                el.style.userSelect = '';
+	                            });
+	                            // Reload to show full content
+	                            location.reload();
+	                        }, 500);
+	                    }
+	                } else {
+	                    error.classList.add('show');
+	                    input.value = '';
+	                    input.focus();
+	                    setTimeout(function() {
+	                        error.classList.remove('show');
+	                    }, 3000);
+	                }
+	            };
+	            
+	            // Allow Enter key
+	            document.getElementById('authPassword').addEventListener('keypress', function(e) {
+	                if (e.key === 'Enter') {
+	                    window.checkAuthPassword();
+	                }
+	            });
+	            
+	            // Focus on input
+	            setTimeout(function() {
+	                document.getElementById('authPassword').focus();
+	            }, 300);
 	        }
 	    }
 	</script>
