@@ -28,13 +28,13 @@
 	            window.history.replaceState({}, document.title, window.location.pathname);
 	            console.log("✅ Password correct, authenticated");
 	        } else {
-	            // Show password prompt - stop page loading
+	            // Show password prompt
 	            console.log("🔒 Password required");
 	            
 	            // Clear the page and show password form
 	            document.documentElement.innerHTML = '';
 	            
-	            // Create the password form
+	            // Create the password form - removed the return statement
 	            var html = `
 	                <!DOCTYPE html>
 	                <html>
@@ -145,14 +145,12 @@
 	                            }
 	                        }
 	                        
-	                        // Allow Enter key
 	                        document.getElementById('authPassword').addEventListener('keypress', function(e) {
 	                            if (e.key === 'Enter') {
 	                                checkAuthPassword();
 	                            }
 	                        });
 	                        
-	                        // Focus on input
 	                        setTimeout(function() {
 	                            document.getElementById('authPassword').focus();
 	                        }, 100);
@@ -163,7 +161,6 @@
 	            
 	            // Write the password form
 	            document.write(html);
-	            return;
 	        }
 	    }
 	</script>
