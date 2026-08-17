@@ -3,8 +3,8 @@ export function middleware(request) {
   // ============================================================
   // CHANGE THESE - Set your username and password
   // ============================================================
-  const USERNAME = "drws";
-  const PASSWORD = "DRws24685868#";
+  const USERNAME = process.env.AUTH_USERNAME || "drws";
+  const PASSWORD = process.env.AUTH_PASSWORD || "DRws24685868#";
   // ============================================================
   
   const auth = request.headers.get('authorization');
