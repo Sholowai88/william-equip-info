@@ -1,0 +1,17 @@
+{
+  "name": "equipment-database",
+  "version": "1.0.0",
+  "description": "NTWC MPU DR Workshop Equipment Management System",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "@vercel/node": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
