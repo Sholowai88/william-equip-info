@@ -30,6 +30,11 @@
         {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "env": {
+            "SITE_PASSWORD": "@site-password"
+          }
         }
       ]
     }
