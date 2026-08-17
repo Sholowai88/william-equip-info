@@ -3,7 +3,7 @@
 // ============================================================
 // CONFIGURATION - CHANGE THESE VALUES
 // ============================================================
-const SITE_PASSWORD = 'DRws24685868#';  // Change this!
+const SITE_PASSWORD = process.env.SITE_PASSWORD || 'DRws24685868#';  // Change this!
 const SESSION_DURATION = 24 * 60 * 60 * 1000;      // 24 hours in milliseconds
 const MAX_LOGIN_ATTEMPTS = 5;                      // Max attempts before timeout
 const LOCKOUT_DURATION = 15 * 60 * 1000;          // 15 minutes lockout
