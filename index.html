@@ -9,45 +9,57 @@
 	<!-- ============================================================ -->
 	<script>
 	    // ============================================================
-	    // CHANGE THIS PASSWORD - Set your desired password
-	    // ============================================================
-	    var SITE_PASSWORD = "DRws24685868#";
+	    // SUPABASE AUTHENTICATION - Replace your current script
 	    // ============================================================
 	    
-	    // Check if already authenticated
-	    if (sessionStorage.getItem('authenticated') === 'true') {
-	        // Already authenticated, proceed normally
-	        console.log("✅ Already authenticated");
-	    } else {
-	        // Check URL for password parameter (for bookmark with password)
-	        var urlParams = new URLSearchParams(window.location.search);
-	        var enteredPassword = urlParams.get('password');
+	    // Supabase configuration (already in your code)
+	    const supabaseUrl = 'https://qhuqlhzvpmhykkmmqtth.supabase.co';
+	    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFodXFsaHp2cG1oeWtrbW1xdHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMTM0OTQsImV4cCI6MjA5Njc4OTQ5NH0.pTTY4irj4vx-us8W1DyYaEB6ug_wEjuwNdy0lJjh_-8';
+	    const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+	    
+	    // Check authentication status
+	    async function checkAuth() {
+	        const { data: { session } } = await supabaseClient.auth.getSession();
 	        
-	        if (enteredPassword === SITE_PASSWORD) {
+	        if (session) {
+	            // User is logged in
+	            console.log("✅ Authenticated:", session.user.email);
 	            sessionStorage.setItem('authenticated', 'true');
-	            window.history.replaceState({}, document.title, window.location.pathname);
-	            console.log("✅ Password correct, authenticated");
-	        } else {
-	            // Password required - show overlay
-	            console.log("🔒 Password required - showing overlay");
-	            
-	            // Wait for DOM to be ready
-	            if (document.readyState === 'loading') {
-	                document.addEventListener('DOMContentLoaded', function() {
-	                    showPasswordOverlay();
+	            sessionStorage.setItem('userEmail', session.user.email);
+	            return true;
+	        }
+	        
+	        // Check URL parameters for magic link
+	        const urlParams = new URLSearchParams(window.location.search);
+	        const accessToken = urlParams.get('access_token');
+	        const refreshToken = urlParams.get('refresh_token');
+	        
+	        if (accessToken) {
+	            try {
+	                const { data, error } = await supabaseClient.auth.setSession({
+	                    access_token: accessToken,
+	                    refresh_token: refreshToken
 	                });
-	            } else {
-	                showPasswordOverlay();
+	                if (!error && data.session) {
+	                    sessionStorage.setItem('authenticated', 'true');
+	                    sessionStorage.setItem('userEmail', data.session.user.email);
+	                    window.history.replaceState({}, document.title, window.location.pathname);
+	                    return true;
+	                }
+	            } catch (e) {
+	                console.error("Session error:", e);
 	            }
 	        }
+	        
+	        return false;
 	    }
 	    
-	    function showPasswordOverlay() {
+	    // Show Supabase login overlay
+	    function showSupabaseLogin() {
 	        // Add overlay styles
 	        var overlayStyles = document.createElement('style');
 	        overlayStyles.textContent = `
-	            /* Password Overlay - Full screen with blur effect */
-	            #passwordOverlay {
+	            #supabaseLoginOverlay {
 	                position: fixed;
 	                top: 0;
 	                left: 0;
@@ -67,7 +79,7 @@
 	                from { opacity: 0; }
 	                to { opacity: 1; }
 	            }
-	            #passwordOverlay .auth-card {
+	            #supabaseLoginOverlay .auth-card {
 	                background: white;
 	                padding: 45px 40px 40px 40px;
 	                border-radius: 28px;
@@ -76,10 +88,8 @@
 	                text-align: center;
 	                box-shadow: 0 30px 80px rgba(0,0,0,0.5);
 	                animation: slideUp 0.5s ease;
-	                position: relative;
-	                overflow: hidden;
 	            }
-	            #passwordOverlay .auth-card::before {
+	            #supabaseLoginOverlay .auth-card::before {
 	                content: '';
 	                position: absolute;
 	                top: 0;
@@ -92,24 +102,24 @@
 	                from { transform: translateY(30px); opacity: 0; }
 	                to { transform: translateY(0); opacity: 1; }
 	            }
-	            #passwordOverlay .auth-icon {
+	            #supabaseLoginOverlay .auth-icon {
 	                font-size: 56px;
 	                margin-bottom: 16px;
 	                display: block;
 	            }
-	            #passwordOverlay .auth-title {
+	            #supabaseLoginOverlay .auth-title {
 	                color: #0a2e3f;
 	                font-size: 22px;
 	                margin-bottom: 6px;
 	                font-weight: 700;
 	            }
-	            #passwordOverlay .auth-subtitle {
+	            #supabaseLoginOverlay .auth-subtitle {
 	                color: #666;
 	                font-size: 14px;
 	                margin-bottom: 25px;
 	                line-height: 1.5;
 	            }
-	            #passwordOverlay .auth-input {
+	            #supabaseLoginOverlay .auth-input {
 	                width: 100%;
 	                padding: 14px 18px;
 	                border: 2px solid #e2e8f0;
@@ -120,13 +130,13 @@
 	                transition: all 0.3s;
 	                background: #f8fafc;
 	            }
-	            #passwordOverlay .auth-input:focus {
+	            #supabaseLoginOverlay .auth-input:focus {
 	                outline: none;
 	                border-color: #1a5c6e;
 	                box-shadow: 0 0 0 4px rgba(26,92,110,0.1);
 	                background: white;
 	            }
-	            #passwordOverlay .auth-btn {
+	            #supabaseLoginOverlay .auth-btn {
 	                width: 100%;
 	                padding: 14px;
 	                background: linear-gradient(135deg, #0a2e3f, #1a5c6e);
@@ -138,15 +148,13 @@
 	                font-weight: 600;
 	                transition: all 0.3s;
 	                letter-spacing: 0.5px;
+	                margin-top: 10px;
 	            }
-	            #passwordOverlay .auth-btn:hover {
+	            #supabaseLoginOverlay .auth-btn:hover {
 	                transform: translateY(-2px);
 	                box-shadow: 0 8px 30px rgba(26,92,110,0.35);
 	            }
-	            #passwordOverlay .auth-btn:active {
-	                transform: scale(0.97);
-	            }
-	            #passwordOverlay .auth-error {
+	            #supabaseLoginOverlay .auth-error {
 	                color: #dc3545;
 	                font-size: 13px;
 	                margin-top: 12px;
@@ -155,7 +163,7 @@
 	                background: #ffe0db;
 	                border-radius: 8px;
 	            }
-	            #passwordOverlay .auth-error.show {
+	            #supabaseLoginOverlay .auth-error.show {
 	                display: block;
 	                animation: shake 0.5s ease;
 	            }
@@ -166,23 +174,47 @@
 	                60% { transform: translateX(-6px); }
 	                80% { transform: translateX(6px); }
 	            }
-	            #passwordOverlay .auth-hint {
-	                font-size: 12px;
-	                color: #999;
-	                margin-top: 15px;
-	            }
-	            #passwordOverlay .auth-footer {
+	            #supabaseLoginOverlay .auth-footer {
 	                margin-top: 18px;
 	                padding-top: 14px;
 	                border-top: 1px solid #eee;
 	                font-size: 11px;
 	                color: #bbb;
 	            }
-	            /* Prevent scrolling while overlay is active */
+	            #supabaseLoginOverlay .auth-divider {
+	                display: flex;
+	                align-items: center;
+	                margin: 15px 0;
+	                color: #999;
+	                font-size: 12px;
+	            }
+	            #supabaseLoginOverlay .auth-divider::before,
+	            #supabaseLoginOverlay .auth-divider::after {
+	                content: '';
+	                flex: 1;
+	                border-bottom: 1px solid #ddd;
+	            }
+	            #supabaseLoginOverlay .auth-divider::before {
+	                margin-right: 10px;
+	            }
+	            #supabaseLoginOverlay .auth-divider::after {
+	                margin-left: 10px;
+	            }
+	            .auth-success {
+	                color: #00a86b;
+	                font-size: 13px;
+	                margin-top: 12px;
+	                display: none;
+	                padding: 8px 12px;
+	                background: #d4edda;
+	                border-radius: 8px;
+	            }
+	            .auth-success.show {
+	                display: block;
+	            }
 	            body.no-scroll {
 	                overflow: hidden !important;
 	            }
-	            /* Blur the background content */
 	            .page-blur {
 	                filter: blur(8px) !important;
 	                -webkit-filter: blur(8px) !important;
@@ -192,10 +224,9 @@
 	        `;
 	        document.head.appendChild(overlayStyles);
 	        
-	        // Add no-scroll class to body
 	        document.body.classList.add('no-scroll');
 	        
-	        // Blur all main content elements
+	        // Blur main content
 	        var elementsToBlur = [
 	            document.getElementById('appContainer'),
 	            document.getElementById('loginPage'),
@@ -204,91 +235,155 @@
 	            document.getElementById('liveTime'),
 	            document.getElementById('liveDate')
 	        ];
-	        
 	        elementsToBlur.forEach(function(el) {
-	            if (el) {
-	                el.classList.add('page-blur');
-	            }
+	            if (el) el.classList.add('page-blur');
 	        });
 	        
-	        // Also blur any visible content
-	        var allContent = document.querySelectorAll('.app-container, .login-container, .ai-assistant, .ai-chat-window, .header, .tabs, .page, .filter-bar, .digital-clock');
-	        allContent.forEach(function(el) {
-	            if (el) {
-	                el.classList.add('page-blur');
-	            }
-	        });
-	        
-	        // Create the overlay
 	        var overlay = document.createElement('div');
-	        overlay.id = 'passwordOverlay';
+	        overlay.id = 'supabaseLoginOverlay';
 	        overlay.innerHTML = `
 	            <div class="auth-card">
 	                <span class="auth-icon">🔬⚡</span>
 	                <h2 class="auth-title">Equipment Database</h2>
-	                <p class="auth-subtitle">This page is password protected.<br>Please enter the password to continue.</p>
-	                <input type="password" class="auth-input" id="authPassword" placeholder="Enter password..." autocomplete="off" autofocus>
-	                <button class="auth-btn" onclick="window.checkAuthPassword()">🔓 Unlock</button>
-	                <div class="auth-error" id="authError">❌ Incorrect password. Please try again.</div>
-	                <div class="auth-hint">🔒 Session expires when you close the browser</div>
-	                <div class="auth-footer">Protected with password</div>
+	                <p class="auth-subtitle">Sign in with your email to continue</p>
+	                
+	                <!-- Email/Password Login -->
+	                <input type="email" class="auth-input" id="loginEmail" placeholder="Email address" autocomplete="email">
+	                <input type="password" class="auth-input" id="loginPassword" placeholder="Password" autocomplete="current-password">
+	                <button class="auth-btn" onclick="window.signInWithEmail()">🔓 Sign In</button>
+	                <div class="auth-error" id="loginError">❌ Invalid email or password. Please try again.</div>
+	                <div class="auth-success" id="loginSuccess">✅ Check your email for the magic link!</div>
+	                
+	                <div class="auth-divider">or</div>
+	                
+	                <!-- Magic Link (Passwordless) -->
+	                <input type="email" class="auth-input" id="magicEmail" placeholder="Email for magic link" autocomplete="email">
+	                <button class="auth-btn" style="background: linear-gradient(135deg, #166b5c, #0a2e3f);" onclick="window.sendMagicLink()">📧 Send Magic Link</button>
+	                <div class="auth-error" id="magicError">❌ Failed to send magic link. Please try again.</div>
+	                <div class="auth-success" id="magicSuccess">✅ Magic link sent! Check your email.</div>
+	                
+	                <div class="auth-footer">🔒 Secured with Supabase Authentication</div>
 	            </div>
 	        `;
 	        document.body.appendChild(overlay);
-	        
-	        // Focus on input
-	        setTimeout(function() {
-	            var input = document.getElementById('authPassword');
-	            if (input) {
-	                input.focus();
-	            }
-	        }, 300);
 	    }
 	    
-	    // Password check function - global for onclick
-	    window.checkAuthPassword = function() {
-	        var input = document.getElementById('authPassword');
-	        var error = document.getElementById('authError');
+	    // Sign in with email and password
+	    window.signInWithEmail = async function() {
+	        const email = document.getElementById('loginEmail').value;
+	        const password = document.getElementById('loginPassword').value;
+	        const errorEl = document.getElementById('loginError');
+	        const successEl = document.getElementById('loginSuccess');
 	        
-	        if (!input || !error) return;
+	        if (!email || !password) {
+	            errorEl.textContent = '❌ Please enter both email and password.';
+	            errorEl.classList.add('show');
+	            return;
+	        }
 	        
-	        var password = input.value;
+	        errorEl.classList.remove('show');
+	        successEl.classList.remove('show');
 	        
-	        if (password === SITE_PASSWORD) {
-	            sessionStorage.setItem('authenticated', 'true');
-	            // Remove overlay and blur
-	            var overlayEl = document.getElementById('passwordOverlay');
-	            if (overlayEl) {
-	                overlayEl.style.transition = 'opacity 0.5s ease';
-	                overlayEl.style.opacity = '0';
-	                setTimeout(function() {
-	                    overlayEl.remove();
-	                    document.body.classList.remove('no-scroll');
-	                    // Remove blur from all elements
-	                    var blurredElements = document.querySelectorAll('.page-blur');
-	                    blurredElements.forEach(function(el) {
-	                        el.classList.remove('page-blur');
-	                    });
-	                    // Reload to show full content
-	                    location.reload();
-	                }, 500);
+	        try {
+	            const { data, error } = await supabaseClient.auth.signInWithPassword({
+	                email: email,
+	                password: password
+	            });
+	            
+	            if (error) {
+	                errorEl.textContent = '❌ ' + error.message;
+	                errorEl.classList.add('show');
+	                return;
 	            }
-	        } else {
-	            error.classList.add('show');
-	            input.value = '';
-	            input.focus();
-	            setTimeout(function() {
-	                error.classList.remove('show');
-	            }, 3000);
+	            
+	            if (data.user) {
+	                successEl.textContent = '✅ Welcome back, ' + data.user.email + '!';
+	                successEl.classList.add('show');
+	                sessionStorage.setItem('authenticated', 'true');
+	                sessionStorage.setItem('userEmail', data.user.email);
+	                
+	                setTimeout(function() {
+	                    location.reload();
+	                }, 1500);
+	            }
+	        } catch (err) {
+	            errorEl.textContent = '❌ ' + err.message;
+	            errorEl.classList.add('show');
 	        }
 	    };
 	    
-	    // Allow Enter key on password input - using event delegation
+	    // Send magic link (passwordless)
+	    window.sendMagicLink = async function() {
+	        const email = document.getElementById('magicEmail').value;
+	        const errorEl = document.getElementById('magicError');
+	        const successEl = document.getElementById('magicSuccess');
+	        
+	        if (!email) {
+	            errorEl.textContent = '❌ Please enter your email address.';
+	            errorEl.classList.add('show');
+	            return;
+	        }
+	        
+	        errorEl.classList.remove('show');
+	        successEl.classList.remove('show');
+	        
+	        try {
+	            const { data, error } = await supabaseClient.auth.signInWithOtp({
+	                email: email,
+	                options: {
+	                    emailRedirectTo: window.location.origin + window.location.pathname
+	                }
+	            });
+	            
+	            if (error) {
+	                errorEl.textContent = '❌ ' + error.message;
+	                errorEl.classList.add('show');
+	                return;
+	            }
+	            
+	            successEl.textContent = '✅ Magic link sent to ' + email + '! Check your email.';
+	            successEl.classList.add('show');
+	        } catch (err) {
+	            errorEl.textContent = '❌ ' + err.message;
+	            errorEl.classList.add('show');
+	        }
+	    };
+	    
+	    // Allow Enter key on login inputs
 	    document.addEventListener('keypress', function(e) {
-	        if (e.target && e.target.id === 'authPassword' && e.key === 'Enter') {
-	            window.checkAuthPassword();
+	        if (e.target && e.target.id === 'loginPassword' && e.key === 'Enter') {
+	            window.signInWithEmail();
+	        }
+	        if (e.target && e.target.id === 'magicEmail' && e.key === 'Enter') {
+	            window.sendMagicLink();
 	        }
 	    });
+	    
+	    // Check authentication on load
+	    (async function() {
+	        // Check if already authenticated via sessionStorage
+	        if (sessionStorage.getItem('authenticated') === 'true') {
+	            console.log("✅ Already authenticated");
+	            return;
+	        }
+	        
+	        // Check Supabase session
+	        const isAuth = await checkAuth();
+	        if (isAuth) {
+	            console.log("✅ Authenticated via Supabase");
+	            return;
+	        }
+	        
+	        // Show login overlay
+	        console.log("🔒 Authentication required");
+	        if (document.readyState === 'loading') {
+	            document.addEventListener('DOMContentLoaded', function() {
+	                showSupabaseLogin();
+	            });
+	        } else {
+	            showSupabaseLogin();
+	        }
+	    })();
 	</script>
 	<!-- ============================================================ -->
 	<!-- END PASSWORD PROTECTION -->
