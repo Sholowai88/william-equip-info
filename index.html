@@ -5,463 +5,537 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
     
     <!-- ============================================================ -->
-	<!-- PASSWORD PROTECTION - Stored in Supabase (SHA-256 Hashed)    -->
-	<!-- ============================================================ -->
-	<script> 
-	    // ============================================================
-	    // SUPABASE CONFIGURATION
-	    // ============================================================
-	    const SUPABASE_URL = 'https://qhuqlhzvpmhykkmmqtth.supabase.co';
-	    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFodXFsaHp2cG1oeWtrbW1xdHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMTM0OTQsImV4cCI6MjA5Njc4OTQ5NH0.pTTY4irj4vx-us8W1DyYaEB6ug_wEjuwNdy0lJjh_-8';
-	    
-	    // ============================================================
-	    // AUTHENTICATION CHECK
-	    // ============================================================
-	    
-	    // Check if already authenticated in this session
-	    if (sessionStorage.getItem('authenticated') === 'true') {
-	        console.log("✅ Already authenticated");
-	    } else {
-	        // Check URL for password parameter (for bookmark with password)
-	        var urlParams = new URLSearchParams(window.location.search);
-	        var enteredPassword = urlParams.get('password');
-	        
-	        if (enteredPassword) {
-	            // Verify password with Supabase
-	            verifyPasswordWithSupabase(enteredPassword, function(isValid) {
-	                if (isValid) {
-	                    sessionStorage.setItem('authenticated', 'true');
-	                    window.history.replaceState({}, document.title, window.location.pathname);
-	                    console.log("✅ Password correct, authenticated");
-	                    // Reload to show content
-	                    location.reload();
-	                } else {
-	                    // Password required - show overlay
-	                    console.log("🔒 Password verification failed - showing overlay");
-	                    showPasswordOverlay();
-	                }
-	            });
-	        } else {
-	            // Password required - show overlay
-	            console.log("🔒 Password required - showing overlay");
-	            showPasswordOverlay();
-	        }
-	    }
-	    
-	    // ============================================================
-	    // PASSWORD VERIFICATION FUNCTIONS
-	    // ============================================================
-	    
-	    /**
-	     * Verify password with Supabase using RPC call
-	     * @param {string} inputPassword - The password to verify
-	     * @param {function} callback - Callback function with boolean result
-	     */
-	    async function verifyPasswordWithSupabase(inputPassword, callback) {
-	        try {
-	            console.log("🔐 Verifying password with Supabase...");
-	            
-	            // Method 1: Call the stored procedure (recommended)
-	            var response = await fetch(SUPABASE_URL + '/rest/v1/rpc/verify_site_password', {
-	                method: 'POST',
-	                headers: {
-	                    'Content-Type': 'application/json',
-	                    'apikey': SUPABASE_ANON_KEY,
-	                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
-	                },
-	                body: JSON.stringify({ 
-	                    input_password: inputPassword 
-	                })
-	            });
-	            
-	            if (response.ok) {
-	                var result = await response.json();
-	                console.log("🔐 Verification result (RPC):", result);
-	                callback(result === true || result === 'true');
-	                return;
-	            }
-	            
-	            // Method 2: Fallback - Direct table query with client-side hashing
-	            console.log("🔄 RPC failed, trying fallback method...");
-	            var fallbackResponse = await fetch(SUPABASE_URL + '/rest/v1/site_passwords?id=eq.0&select=password_hash', {
-	                method: 'GET',
-	                headers: {
-	                    'Content-Type': 'application/json',
-	                    'apikey': SUPABASE_ANON_KEY,
-	                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
-	                }
-	            });
-	            
-	            if (fallbackResponse.ok) {
-	                var data = await fallbackResponse.json();
-	                console.log("📊 Fallback data received:", data);
-	                
-	                if (data && data.length > 0 && data[0].password_hash) {
-	                    // Hash the input password and compare
-	                    var hashedInput = await hashPasswordSHA256(inputPassword);
-	                    var isValid = hashedInput === data[0].password_hash;
-	                    console.log("🔐 Fallback verification result:", isValid);
-	                    callback(isValid);
-	                    return;
-	                }
-	            }
-	            
-	            // Method 3: Emergency fallback - check against a known hash
-	            console.log("⚠️ All methods failed, trying emergency fallback...");
-	            // This is a SHA-256 hash of "DRws24685868#"
-	            var emergencyHash = '6a5c1b5f6e8c9a7b3d4e2f1a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c';
-	            var hashedInput = await hashPasswordSHA256(inputPassword);
-	            callback(hashedInput === emergencyHash);
-	            
-	        } catch (err) {
-	            console.error("❌ Password verification error:", err);
-	            callback(false);
-	        }
-	    }
-	    
-	    /**
-	     * SHA-256 hash function using Web Crypto API
-	     * @param {string} password - The password to hash
-	     * @returns {string} - Hex string of the hash
-	     */
-	    async function hashPasswordSHA256(password) {
-	        try {
-	            var encoder = new TextEncoder();
-	            var data = encoder.encode(password);
-	            var hashBuffer = await crypto.subtle.digest('SHA-256', data);
-	            var hashArray = Array.from(new Uint8Array(hashBuffer));
-	            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-	        } catch (err) {
-	            console.error("❌ Hash error:", err);
-	            // Simple fallback hash (not secure but works for emergency)
-	            return password.split('').reduce(function(a, b) {
-	                a = ((a << 5) - a) + b.charCodeAt(0);
-	                return a & a;
-	            }, 0).toString(16);
-	        }
-	    }
-	    
-	    // ============================================================
-	    // PASSWORD CHECK FUNCTION - Called from UI
-	    // ============================================================
-	    
-	    window.checkAuthPassword = function() {
-	        var input = document.getElementById('authPassword');
-	        var error = document.getElementById('authError');
-	        
-	        if (!input || !error) {
-	            console.error("❌ Password input or error element not found");
-	            return;
-	        }
-	        
-	        var password = input.value;
-	        
-	        if (!password || password.length < 1) {
-	            error.classList.add('show');
-	            error.textContent = '❌ Please enter a password';
-	            input.focus();
-	            setTimeout(function() {
-	                error.classList.remove('show');
-	            }, 3000);
-	            return;
-	        }
-	        
-	        // Show loading state
-	        var btn = document.querySelector('.auth-btn');
-	        if (btn) {
-	            btn.textContent = '⏳ Verifying...';
-	            btn.disabled = true;
-	        }
-	        
-	        verifyPasswordWithSupabase(password, function(isValid) {
-	            // Reset button state
-	            if (btn) {
-	                btn.textContent = '🔓 Unlock';
-	                btn.disabled = false;
-	            }
-	            
-	            if (isValid) {
-	                // Password correct - authenticate
-	                sessionStorage.setItem('authenticated', 'true');
-	                var overlayEl = document.getElementById('passwordOverlay');
-	                if (overlayEl) {
-	                    overlayEl.style.transition = 'opacity 0.5s ease';
-	                    overlayEl.style.opacity = '0';
-	                    setTimeout(function() {
-	                        overlayEl.remove();
-	                        document.body.classList.remove('no-scroll');
-	                        var blurredElements = document.querySelectorAll('.page-blur');
-	                        blurredElements.forEach(function(el) {
-	                            el.classList.remove('page-blur');
-	                        });
-	                        // Reload to show full content
-	                        location.reload();
-	                    }, 500);
-	                }
-	            } else {
-	                // Password incorrect
-	                error.classList.add('show');
-	                error.textContent = '❌ Incorrect password. Please try again.';
-	                input.value = '';
-	                input.focus();
-	                setTimeout(function() {
-	                    error.classList.remove('show');
-	                }, 3000);
-	            }
-	        });
-	    };
-	    
-	    // ============================================================
-	    // ENTER KEY SUPPORT
-	    // ============================================================
-	    
-	    document.addEventListener('keypress', function(e) {
-	        if (e.target && e.target.id === 'authPassword' && e.key === 'Enter') {
-	            e.preventDefault();
-	            window.checkAuthPassword();
-	        }
-	    });
-	    
-	    // ============================================================
-	    // PASSWORD OVERLAY - SHOW ON UNAUTHENTICATED ACCESS
-	    // ============================================================
-	    
-	    function showPasswordOverlay() {
-	        // Wait for DOM to be ready
-	        if (document.readyState === 'loading') {
-	            document.addEventListener('DOMContentLoaded', function() {
-	                createPasswordOverlay();
-	            });
-	        } else {
-	            createPasswordOverlay();
-	        }
-	    }
-	    
-	    function createPasswordOverlay() {
-	        // Add overlay styles
-	        var overlayStyles = document.createElement('style');
-	        overlayStyles.textContent = `
-	            /* Password Overlay - Full screen with blur effect */
-	            #passwordOverlay {
-	                position: fixed;
-	                top: 0;
-	                left: 0;
-	                width: 100%;
-	                height: 100%;
-	                background: rgba(0, 0, 0, 0.75);
-	                backdrop-filter: blur(15px);
-	                -webkit-backdrop-filter: blur(15px);
-	                display: flex;
-	                align-items: center;
-	                justify-content: center;
-	                z-index: 999999;
-	                font-family: 'Segoe UI', sans-serif;
-	                animation: fadeInOverlay 0.5s ease;
-	            }
-	            @keyframes fadeInOverlay {
-	                from { opacity: 0; }
-	                to { opacity: 1; }
-	            }
-	            #passwordOverlay .auth-card {
-	                background: white;
-	                padding: 45px 40px 40px 40px;
-	                border-radius: 28px;
-	                max-width: 420px;
-	                width: 90%;
-	                text-align: center;
-	                box-shadow: 0 30px 80px rgba(0,0,0,0.5);
-	                animation: slideUp 0.5s ease;
-	                position: relative;
-	                overflow: hidden;
-	            }
-	            #passwordOverlay .auth-card::before {
-	                content: '';
-	                position: absolute;
-	                top: 0;
-	                left: 0;
-	                right: 0;
-	                height: 4px;
-	                background: linear-gradient(90deg, #0a2e3f, #1a5c6e, #0a2e3f);
-	            }
-	            @keyframes slideUp {
-	                from { transform: translateY(30px); opacity: 0; }
-	                to { transform: translateY(0); opacity: 1; }
-	            }
-	            #passwordOverlay .auth-icon {
-	                font-size: 56px;
-	                margin-bottom: 16px;
-	                display: block;
-	            }
-	            #passwordOverlay .auth-title {
-	                color: #0a2e3f;
-	                font-size: 22px;
-	                margin-bottom: 6px;
-	                font-weight: 700;
-	            }
-	            #passwordOverlay .auth-subtitle {
-	                color: #666;
-	                font-size: 14px;
-	                margin-bottom: 25px;
-	                line-height: 1.5;
-	            }
-	            #passwordOverlay .auth-input {
-	                width: 100%;
-	                padding: 14px 18px;
-	                border: 2px solid #e2e8f0;
-	                border-radius: 14px;
-	                font-size: 16px;
-	                margin-bottom: 15px;
-	                box-sizing: border-box;
-	                transition: all 0.3s;
-	                background: #f8fafc;
-	            }
-	            #passwordOverlay .auth-input:focus {
-	                outline: none;
-	                border-color: #1a5c6e;
-	                box-shadow: 0 0 0 4px rgba(26,92,110,0.1);
-	                background: white;
-	            }
-	            #passwordOverlay .auth-btn {
-	                width: 100%;
-	                padding: 14px;
-	                background: linear-gradient(135deg, #0a2e3f, #1a5c6e);
-	                color: white;
-	                border: none;
-	                border-radius: 14px;
-	                font-size: 16px;
-	                cursor: pointer;
-	                font-weight: 600;
-	                transition: all 0.3s;
-	                letter-spacing: 0.5px;
-	            }
-	            #passwordOverlay .auth-btn:hover {
-	                transform: translateY(-2px);
-	                box-shadow: 0 8px 30px rgba(26,92,110,0.35);
-	            }
-	            #passwordOverlay .auth-btn:active {
-	                transform: scale(0.97);
-	            }
-	            #passwordOverlay .auth-btn:disabled {
-	                opacity: 0.7;
-	                cursor: not-allowed;
-	                transform: none;
-	            }
-	            #passwordOverlay .auth-error {
-	                color: #dc3545;
-	                font-size: 13px;
-	                margin-top: 12px;
-	                display: none;
-	                padding: 8px 12px;
-	                background: #ffe0db;
-	                border-radius: 8px;
-	            }
-	            #passwordOverlay .auth-error.show {
-	                display: block;
-	                animation: shake 0.5s ease;
-	            }
-	            @keyframes shake {
-	                0%, 100% { transform: translateX(0); }
-	                20% { transform: translateX(-10px); }
-	                40% { transform: translateX(10px); }
-	                60% { transform: translateX(-6px); }
-	                80% { transform: translateX(6px); }
-	            }
-	            #passwordOverlay .auth-hint {
-	                font-size: 12px;
-	                color: #999;
-	                margin-top: 15px;
-	            }
-	            #passwordOverlay .auth-footer {
-	                margin-top: 18px;
-	                padding-top: 14px;
-	                border-top: 1px solid #eee;
-	                font-size: 11px;
-	                color: #bbb;
-	            }
-	            #passwordOverlay .auth-security {
-	                margin-top: 10px;
-	                font-size: 11px;
-	                color: #2ecc71;
-	                background: #eafaf1;
-	                padding: 4px 12px;
-	                border-radius: 20px;
-	                display: inline-block;
-	            }
-	            /* Prevent scrolling while overlay is active */
-	            body.no-scroll {
-	                overflow: hidden !important;
-	            }
-	            /* Blur the background content */
-	            .page-blur {
-	                filter: blur(8px) !important;
-	                -webkit-filter: blur(8px) !important;
-	                pointer-events: none !important;
-	                user-select: none !important;
-	            }
-	        `;
-	        document.head.appendChild(overlayStyles);
-	        
-	        // Add no-scroll class to body
-	        document.body.classList.add('no-scroll');
-	        
-	        // Blur all main content elements
-	        var elementsToBlur = [
-	            document.getElementById('appContainer'),
-	            document.getElementById('loginPage'),
-	            document.getElementById('aiAssistant'),
-	            document.getElementById('aiChatWindow'),
-	            document.getElementById('liveTime'),
-	            document.getElementById('liveDate')
-	        ];
-	        
-	        elementsToBlur.forEach(function(el) {
-	            if (el) {
-	                el.classList.add('page-blur');
-	            }
-	        });
-	        
-	        // Also blur any visible content
-	        var allContent = document.querySelectorAll('.app-container, .login-container, .ai-assistant, .ai-chat-window, .header, .tabs, .page, .filter-bar, .digital-clock');
-	        allContent.forEach(function(el) {
-	            if (el) {
-	                el.classList.add('page-blur');
-	            }
-	        });
-	        
-	        // Create the overlay
-	        var overlay = document.createElement('div');
-	        overlay.id = 'passwordOverlay';
-	        overlay.innerHTML = `
-	            <div class="auth-card">
-	                <span class="auth-icon">🔬⚡</span>
-	                <h2 class="auth-title">Equipment Database</h2>
-	                <p class="auth-subtitle">This page is password protected.<br>Please enter the password to continue.</p>
-	                <input type="password" class="auth-input" id="authPassword" placeholder="Enter password..." autocomplete="off" autofocus>
-	                <button class="auth-btn" onclick="window.checkAuthPassword()">🔓 Unlock</button>
-	                <div class="auth-error" id="authError">❌ Incorrect password. Please try again.</div>
-	                <div class="auth-security">🔐 Password stored securely (SHA-256)</div>
-	                <div class="auth-hint">🔒 Session expires when you close the browser</div>
-	                <div class="auth-footer">Protected with Supabase Security</div>
-	            </div>
-	        `;
-	        document.body.appendChild(overlay);
-	        
-	        // Focus on input after a delay
-	        setTimeout(function() {
-	            var input = document.getElementById('authPassword');
-	            if (input) {
-	                input.focus();
-	            }
-	        }, 300);
-	    }
-	</script>
-	<!-- ============================================================ -->
-	<!-- END PASSWORD PROTECTION -->
-	<!-- ============================================================ -->
-	
+    <!-- 🔐 START: SECURE CONFIGURATION LOADER                        -->
+    <!-- ============================================================ -->
+    <script>
+        // ============================================================
+        // CONFIGURATION LOADER - Loads config from external file
+        // ============================================================
+        
+        // Determine environment
+        const isProduction = window.location.hostname !== 'localhost' && 
+                            window.location.hostname !== '127.0.0.1' &&
+                            !window.location.hostname.includes('github.io');
+        
+        // Load the appropriate config file
+        // For production (GitHub Pages), use config.prod.js (generated by GitHub Actions)
+        // For local development, use config/config.js
+        const configFile = isProduction ? 'config.prod.js' : 'config/config.js';
+        
+        // Create script element to load config
+        const configScript = document.createElement('script');
+        configScript.src = configFile;
+        configScript.onerror = function() {
+            console.error('❌ Failed to load config file:', configFile);
+            // Fallback: Try to load from window.__CONFIG__ or show error
+            if (typeof window.__CONFIG__ === 'undefined') {
+                document.body.innerHTML = `
+                    <div style="text-align:center; padding:50px; color:red; font-family:sans-serif;">
+                        <h1>⚠️ Configuration Error</h1>
+                        <p>Unable to load configuration. Please check your setup.</p>
+                        <p style="font-size:12px; color:#666;">Missing: ${configFile}</p>
+                        <p style="font-size:12px; color:#666; margin-top:10px;">
+                            For local development, create config/config.js from config.template.js
+                        </p>
+                    </div>
+                `;
+                throw new Error('Config file not found');
+            }
+        };
+        configScript.onload = function() {
+            console.log('✅ Config loaded successfully');
+            // Proceed with password protection
+            initializePasswordProtection();
+        };
+        document.head.appendChild(configScript);
+        
+        // ============================================================
+        // PASSWORD PROTECTION - Uses config for Supabase credentials
+        // ============================================================
+        
+        function initializePasswordProtection() {
+            const CONFIG = window.__CONFIG__;
+            
+            if (!CONFIG || !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
+                console.error('❌ Configuration not available - cannot initialize password protection');
+                document.body.innerHTML = `
+                    <div style="text-align:center; padding:50px; color:red; font-family:sans-serif;">
+                        <h1>⚠️ Configuration Error</h1>
+                        <p>Supabase configuration not found. Please contact administrator.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            console.log('🔐 Initializing password protection with Supabase...');
+            
+            // ============================================================
+            // SUPABASE CONFIGURATION - FROM SECURE CONFIG
+            // ============================================================
+            const SUPABASE_URL = CONFIG.SUPABASE_URL;
+            const SUPABASE_ANON_KEY = CONFIG.SUPABASE_ANON_KEY;
+            
+            // ============================================================
+            // AUTHENTICATION CHECK
+            // ============================================================
+            
+            // Check if already authenticated in this session
+            if (sessionStorage.getItem('authenticated') === 'true') {
+                console.log("✅ Already authenticated");
+            } else {
+                // Check URL for password parameter (for bookmark with password)
+                var urlParams = new URLSearchParams(window.location.search);
+                var enteredPassword = urlParams.get('password');
+                
+                if (enteredPassword) {
+                    // Verify password with Supabase
+                    verifyPasswordWithSupabase(enteredPassword, function(isValid) {
+                        if (isValid) {
+                            sessionStorage.setItem('authenticated', 'true');
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                            console.log("✅ Password correct, authenticated");
+                            // Reload to show content
+                            location.reload();
+                        } else {
+                            // Password required - show overlay
+                            console.log("🔒 Password verification failed - showing overlay");
+                            showPasswordOverlay();
+                        }
+                    });
+                } else {
+                    // Password required - show overlay
+                    console.log("🔒 Password required - showing overlay");
+                    showPasswordOverlay();
+                }
+            }
+            
+            // ============================================================
+            // PASSWORD VERIFICATION FUNCTIONS
+            // ============================================================
+            
+            /**
+             * Verify password with Supabase using RPC call
+             * @param {string} inputPassword - The password to verify
+             * @param {function} callback - Callback function with boolean result
+             */
+            async function verifyPasswordWithSupabase(inputPassword, callback) {
+                try {
+                    console.log("🔐 Verifying password with Supabase...");
+                    
+                    // Method 1: Call the stored procedure (recommended)
+                    var response = await fetch(SUPABASE_URL + '/rest/v1/rpc/verify_site_password', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                        },
+                        body: JSON.stringify({ 
+                            input_password: inputPassword 
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        var result = await response.json();
+                        console.log("🔐 Verification result (RPC):", result);
+                        callback(result === true || result === 'true');
+                        return;
+                    }
+                    
+                    // Method 2: Fallback - Direct table query with client-side hashing
+                    console.log("🔄 RPC failed, trying fallback method...");
+                    var fallbackResponse = await fetch(SUPABASE_URL + '/rest/v1/site_passwords?id=eq.0&select=password_hash', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                        }
+                    });
+                    
+                    if (fallbackResponse.ok) {
+                        var data = await fallbackResponse.json();
+                        console.log("📊 Fallback data received:", data);
+                        
+                        if (data && data.length > 0 && data[0].password_hash) {
+                            // Hash the input password and compare
+                            var hashedInput = await hashPasswordSHA256(inputPassword);
+                            var isValid = hashedInput === data[0].password_hash;
+                            console.log("🔐 Fallback verification result:", isValid);
+                            callback(isValid);
+                            return;
+                        }
+                    }
+                    
+                    // Method 3: Emergency fallback - check against a known hash
+                    console.log("⚠️ All methods failed, trying emergency fallback...");
+                    // This is a SHA-256 hash of "DRws24685868#"
+                    var emergencyHash = '6a5c1b5f6e8c9a7b3d4e2f1a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c';
+                    var hashedInput = await hashPasswordSHA256(inputPassword);
+                    callback(hashedInput === emergencyHash);
+                    
+                } catch (err) {
+                    console.error("❌ Password verification error:", err);
+                    callback(false);
+                }
+            }
+            
+            /**
+             * SHA-256 hash function using Web Crypto API
+             * @param {string} password - The password to hash
+             * @returns {string} - Hex string of the hash
+             */
+            async function hashPasswordSHA256(password) {
+                try {
+                    var encoder = new TextEncoder();
+                    var data = encoder.encode(password);
+                    var hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                    var hashArray = Array.from(new Uint8Array(hashBuffer));
+                    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                } catch (err) {
+                    console.error("❌ Hash error:", err);
+                    // Simple fallback hash (not secure but works for emergency)
+                    return password.split('').reduce(function(a, b) {
+                        a = ((a << 5) - a) + b.charCodeAt(0);
+                        return a & a;
+                    }, 0).toString(16);
+                }
+            }
+            
+            // ============================================================
+            // PASSWORD CHECK FUNCTION - Called from UI
+            // ============================================================
+            
+            window.checkAuthPassword = function() {
+                var input = document.getElementById('authPassword');
+                var error = document.getElementById('authError');
+                
+                if (!input || !error) {
+                    console.error("❌ Password input or error element not found");
+                    return;
+                }
+                
+                var password = input.value;
+                
+                if (!password || password.length < 1) {
+                    error.classList.add('show');
+                    error.textContent = '❌ Please enter a password';
+                    input.focus();
+                    setTimeout(function() {
+                        error.classList.remove('show');
+                    }, 3000);
+                    return;
+                }
+                
+                // Show loading state
+                var btn = document.querySelector('.auth-btn');
+                if (btn) {
+                    btn.textContent = '⏳ Verifying...';
+                    btn.disabled = true;
+                }
+                
+                verifyPasswordWithSupabase(password, function(isValid) {
+                    // Reset button state
+                    if (btn) {
+                        btn.textContent = '🔓 Unlock';
+                        btn.disabled = false;
+                    }
+                    
+                    if (isValid) {
+                        // Password correct - authenticate
+                        sessionStorage.setItem('authenticated', 'true');
+                        var overlayEl = document.getElementById('passwordOverlay');
+                        if (overlayEl) {
+                            overlayEl.style.transition = 'opacity 0.5s ease';
+                            overlayEl.style.opacity = '0';
+                            setTimeout(function() {
+                                overlayEl.remove();
+                                document.body.classList.remove('no-scroll');
+                                var blurredElements = document.querySelectorAll('.page-blur');
+                                blurredElements.forEach(function(el) {
+                                    el.classList.remove('page-blur');
+                                });
+                                // Reload to show full content
+                                location.reload();
+                            }, 500);
+                        }
+                    } else {
+                        // Password incorrect
+                        error.classList.add('show');
+                        error.textContent = '❌ Incorrect password. Please try again.';
+                        input.value = '';
+                        input.focus();
+                        setTimeout(function() {
+                            error.classList.remove('show');
+                        }, 3000);
+                    }
+                });
+            };
+            
+            // ============================================================
+            // ENTER KEY SUPPORT
+            // ============================================================
+            
+            document.addEventListener('keypress', function(e) {
+                if (e.target && e.target.id === 'authPassword' && e.key === 'Enter') {
+                    e.preventDefault();
+                    window.checkAuthPassword();
+                }
+            });
+            
+            // ============================================================
+            // PASSWORD OVERLAY - SHOW ON UNAUTHENTICATED ACCESS
+            // ============================================================
+            
+            function showPasswordOverlay() {
+                // Wait for DOM to be ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', function() {
+                        createPasswordOverlay();
+                    });
+                } else {
+                    createPasswordOverlay();
+                }
+            }
+            
+            function createPasswordOverlay() {
+                // Add overlay styles
+                var overlayStyles = document.createElement('style');
+                overlayStyles.textContent = `
+                    /* Password Overlay - Full screen with blur effect */
+                    #passwordOverlay {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0, 0, 0, 0.75);
+                        backdrop-filter: blur(15px);
+                        -webkit-backdrop-filter: blur(15px);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 999999;
+                        font-family: 'Segoe UI', sans-serif;
+                        animation: fadeInOverlay 0.5s ease;
+                    }
+                    @keyframes fadeInOverlay {
+                        from { opacity: 0; }
+                        to { opacity: 1; }
+                    }
+                    #passwordOverlay .auth-card {
+                        background: white;
+                        padding: 45px 40px 40px 40px;
+                        border-radius: 28px;
+                        max-width: 420px;
+                        width: 90%;
+                        text-align: center;
+                        box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+                        animation: slideUp 0.5s ease;
+                        position: relative;
+                        overflow: hidden;
+                    }
+                    #passwordOverlay .auth-card::before {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        height: 4px;
+                        background: linear-gradient(90deg, #0a2e3f, #1a5c6e, #0a2e3f);
+                    }
+                    @keyframes slideUp {
+                        from { transform: translateY(30px); opacity: 0; }
+                        to { transform: translateY(0); opacity: 1; }
+                    }
+                    #passwordOverlay .auth-icon {
+                        font-size: 56px;
+                        margin-bottom: 16px;
+                        display: block;
+                    }
+                    #passwordOverlay .auth-title {
+                        color: #0a2e3f;
+                        font-size: 22px;
+                        margin-bottom: 6px;
+                        font-weight: 700;
+                    }
+                    #passwordOverlay .auth-subtitle {
+                        color: #666;
+                        font-size: 14px;
+                        margin-bottom: 25px;
+                        line-height: 1.5;
+                    }
+                    #passwordOverlay .auth-input {
+                        width: 100%;
+                        padding: 14px 18px;
+                        border: 2px solid #e2e8f0;
+                        border-radius: 14px;
+                        font-size: 16px;
+                        margin-bottom: 15px;
+                        box-sizing: border-box;
+                        transition: all 0.3s;
+                        background: #f8fafc;
+                    }
+                    #passwordOverlay .auth-input:focus {
+                        outline: none;
+                        border-color: #1a5c6e;
+                        box-shadow: 0 0 0 4px rgba(26,92,110,0.1);
+                        background: white;
+                    }
+                    #passwordOverlay .auth-btn {
+                        width: 100%;
+                        padding: 14px;
+                        background: linear-gradient(135deg, #0a2e3f, #1a5c6e);
+                        color: white;
+                        border: none;
+                        border-radius: 14px;
+                        font-size: 16px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        transition: all 0.3s;
+                        letter-spacing: 0.5px;
+                    }
+                    #passwordOverlay .auth-btn:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 8px 30px rgba(26,92,110,0.35);
+                    }
+                    #passwordOverlay .auth-btn:active {
+                        transform: scale(0.97);
+                    }
+                    #passwordOverlay .auth-btn:disabled {
+                        opacity: 0.7;
+                        cursor: not-allowed;
+                        transform: none;
+                    }
+                    #passwordOverlay .auth-error {
+                        color: #dc3545;
+                        font-size: 13px;
+                        margin-top: 12px;
+                        display: none;
+                        padding: 8px 12px;
+                        background: #ffe0db;
+                        border-radius: 8px;
+                    }
+                    #passwordOverlay .auth-error.show {
+                        display: block;
+                        animation: shake 0.5s ease;
+                    }
+                    @keyframes shake {
+                        0%, 100% { transform: translateX(0); }
+                        20% { transform: translateX(-10px); }
+                        40% { transform: translateX(10px); }
+                        60% { transform: translateX(-6px); }
+                        80% { transform: translateX(6px); }
+                    }
+                    #passwordOverlay .auth-hint {
+                        font-size: 12px;
+                        color: #999;
+                        margin-top: 15px;
+                    }
+                    #passwordOverlay .auth-footer {
+                        margin-top: 18px;
+                        padding-top: 14px;
+                        border-top: 1px solid #eee;
+                        font-size: 11px;
+                        color: #bbb;
+                    }
+                    #passwordOverlay .auth-security {
+                        margin-top: 10px;
+                        font-size: 11px;
+                        color: #2ecc71;
+                        background: #eafaf1;
+                        padding: 4px 12px;
+                        border-radius: 20px;
+                        display: inline-block;
+                    }
+                    /* Prevent scrolling while overlay is active */
+                    body.no-scroll {
+                        overflow: hidden !important;
+                    }
+                    /* Blur the background content */
+                    .page-blur {
+                        filter: blur(8px) !important;
+                        -webkit-filter: blur(8px) !important;
+                        pointer-events: none !important;
+                        user-select: none !important;
+                    }
+                `;
+                document.head.appendChild(overlayStyles);
+                
+                // Add no-scroll class to body
+                document.body.classList.add('no-scroll');
+                
+                // Blur all main content elements
+                var elementsToBlur = [
+                    document.getElementById('appContainer'),
+                    document.getElementById('loginPage'),
+                    document.getElementById('aiAssistant'),
+                    document.getElementById('aiChatWindow'),
+                    document.getElementById('liveTime'),
+                    document.getElementById('liveDate')
+                ];
+                
+                elementsToBlur.forEach(function(el) {
+                    if (el) {
+                        el.classList.add('page-blur');
+                    }
+                });
+                
+                // Also blur any visible content
+                var allContent = document.querySelectorAll('.app-container, .login-container, .ai-assistant, .ai-chat-window, .header, .tabs, .page, .filter-bar, .digital-clock');
+                allContent.forEach(function(el) {
+                    if (el) {
+                        el.classList.add('page-blur');
+                    }
+                });
+                
+                // Create the overlay
+                var overlay = document.createElement('div');
+                overlay.id = 'passwordOverlay';
+                overlay.innerHTML = `
+                    <div class="auth-card">
+                        <span class="auth-icon">🔬⚡</span>
+                        <h2 class="auth-title">Equipment Database</h2>
+                        <p class="auth-subtitle">This page is password protected.<br>Please enter the password to continue.</p>
+                        <input type="password" class="auth-input" id="authPassword" placeholder="Enter password..." autocomplete="off" autofocus>
+                        <button class="auth-btn" onclick="window.checkAuthPassword()">🔓 Unlock</button>
+                        <div class="auth-error" id="authError">❌ Incorrect password. Please try again.</div>
+                        <div class="auth-security">🔐 Password stored securely (SHA-256)</div>
+                        <div class="auth-hint">🔒 Session expires when you close the browser</div>
+                        <div class="auth-footer">Protected with Supabase Security</div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                
+                // Focus on input after a delay
+                setTimeout(function() {
+                    var input = document.getElementById('authPassword');
+                    if (input) {
+                        input.focus();
+                    }
+                }, 300);
+            }
+            
+            // Make functions globally accessible
+            window.verifyPasswordWithSupabase = verifyPasswordWithSupabase;
+            window.hashPasswordSHA256 = hashPasswordSHA256;
+        }
+    </script>
+    <!-- ============================================================ -->
+    <!-- 🔐 END: SECURE CONFIGURATION LOADER                          -->
+    <!-- ============================================================ -->
+    
     <title>NTWC MPU DR Workshop | Equipment Management System</title>
+    
+    <!-- ============================================================ -->
+    <!-- EXTERNAL LIBRARIES - UNCHANGED                               -->
+    <!-- ============================================================ -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- ============================================================ -->
+    <!-- STYLES - COPY ALL YOUR EXISTING STYLES HERE                  -->
+    <!-- ============================================================ -->
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, system-ui, sans-serif; }
         body { background: #eef2f9; padding: 16px; min-height: 100vh; }
@@ -482,324 +556,324 @@
         .login-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); background: linear-gradient(135deg, #1a5c6e, #0a2e3f); }
         .error-msg { color: #dc3545; font-size: 0.85rem; margin-top: 15px; background: #ffe0db; padding: 10px; border-radius: 30px; }
 
-		/* Poke notification override - ensure it can be shown */
-		#pokeNotification { display: none !important; }
-		#pokeNotification.visible { display: inline-block !important; visibility: visible !important; opacity: 1 !important; }
-		
+        /* Poke notification override - ensure it can be shown */
+        #pokeNotification { display: none !important; }
+        #pokeNotification.visible { display: inline-block !important; visibility: visible !important; opacity: 1 !important; }
+        
         /* ============================================================
-		   AI ASSISTANT - PROFESSIONAL CHAT DESIGN
-		   ============================================================ */
-		.ai-assistant { 
-		    position: fixed; 
-		    bottom: 30px; 
-		    right: 30px; 
-		    cursor: pointer; 
-		    z-index: 1000; 
-		    transition: all 0.3s ease; 
-		}
-		.ai-avatar { 
-		    width: 70px; 
-		    height: 70px; 
-		    background: linear-gradient(135deg, #0a2e3f, #1a5c6e); 
-		    border-radius: 50%; 
-		    display: flex; 
-		    align-items: center; 
-		    justify-content: center; 
-		    box-shadow: 0 8px 30px rgba(0,0,0,0.3); 
-		    transition: all 0.3s; 
-		    border: 3px solid white; 
-		    animation: pulse-ai 2s infinite; 
-		}
-		.ai-avatar:hover { 
-		    transform: scale(1.1) rotate(-5deg); 
-		    box-shadow: 0 12px 40px rgba(26,92,110,0.4); 
-		}
-		.ai-avatar span { 
-		    font-size: 36px; 
-		    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.2)); 
-		}
-		@keyframes pulse-ai { 
-		    0% { box-shadow: 0 0 0 0 rgba(26,92,110,0.4); } 
-		    70% { box-shadow: 0 0 0 20px rgba(26,92,110,0); } 
-		    100% { box-shadow: 0 0 0 0 rgba(26,92,110,0); } 
-		}
-		
-		.ai-chat-window { 
-		    position: fixed; 
-		    bottom: 110px; 
-		    right: 30px; 
-		    width: 400px; 
-		    height: 600px; 
-		    background: white; 
-		    border-radius: 20px; 
-		    box-shadow: 0 20px 60px rgba(0,0,0,0.25); 
-		    display: none; 
-		    flex-direction: column; 
-		    overflow: hidden; 
-		    z-index: 1001; 
-		    border: 1px solid rgba(255,255,255,0.1);
-		    transition: all 0.3s ease;
-		}
-		
-		.ai-chat-header { 
-		    background: linear-gradient(135deg, #0a2e3f, #1a5c6e); 
-		    color: white; 
-		    padding: 16px 20px; 
-		    display: flex; 
-		    flex-direction: column;
-		    justify-content: space-between; 
-		    align-items: stretch; 
-		    cursor: move; 
-		    border-bottom: 3px solid rgba(255,255,255,0.1);
-		    flex-shrink: 0;
-		}
-		.ai-chat-header-top {
-		    display: flex;
-		    justify-content: space-between;
-		    align-items: center;
-		}
-		.ai-chat-header h4 { 
-		    margin: 0; 
-		    font-size: 16px; 
-		    display: flex; 
-		    align-items: center; 
-		    gap: 10px; 
-		    font-weight: 600;
-		    letter-spacing: 0.3px;
-		}
-		.ai-chat-header h4 span {
-		    background: rgba(255,255,255,0.15);
-		    padding: 2px 10px;
-		    border-radius: 20px;
-		    font-size: 10px;
-		    font-weight: 400;
-		    letter-spacing: 0.5px;
-		}
-		.ai-chat-header button { 
-		    background: rgba(255,255,255,0.2); 
-		    border: none; 
-		    color: white; 
-		    border-radius: 50%; 
-		    width: 32px; 
-		    height: 32px; 
-		    cursor: pointer; 
-		    font-size: 18px; 
-		    transition: all 0.3s;
-		    display: flex;
-		    align-items: center;
-		    justify-content: center;
-		}
-		.ai-chat-header button:hover { 
-		    background: rgba(255,255,255,0.35); 
-		    transform: rotate(90deg);
-		}
-		
-		.ai-quick-actions {
-		    display: flex;
-		    gap: 6px;
-		    margin-top: 10px;
-		    flex-wrap: wrap;
-		    padding-top: 10px;
-		    border-top: 1px solid rgba(255,255,255,0.1);
-		}
-		.ai-quick-actions button {
-		    background: rgba(255,255,255,0.15);
-		    color: white;
-		    border: none;
-		    padding: 4px 14px;
-		    border-radius: 20px;
-		    font-size: 11px;
-		    cursor: pointer;
-		    transition: all 0.3s;
-		    font-weight: 500;
-		    letter-spacing: 0.3px;
-		}
-		.ai-quick-actions button:hover {
-		    background: rgba(255,255,255,0.3);
-		    transform: translateY(-1px);
-		    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-		}
-		.ai-quick-actions button:active {
-		    transform: scale(0.95);
-		}
-		
-		.ai-messages { 
-		    flex: 1; 
-		    padding: 16px 18px; 
-		    overflow-y: auto; 
-		    background: #f0f4f8;
-		    display: flex;
-		    flex-direction: column;
-		    gap: 8px;
-		}
-		.ai-messages::-webkit-scrollbar {
-		    width: 5px;
-		}
-		.ai-messages::-webkit-scrollbar-track {
-		    background: #e8edf2;
-		    border-radius: 10px;
-		}
-		.ai-messages::-webkit-scrollbar-thumb {
-		    background: #1a5c6e;
-		    border-radius: 10px;
-		}
-		
-		.message { 
-		    margin-bottom: 4px; 
-		    display: flex; 
-		    flex-direction: column; 
-		    animation: fadeInUp 0.3s ease;
-		}
-		@keyframes fadeInUp {
-		    from { opacity: 0; transform: translateY(10px); }
-		    to { opacity: 1; transform: translateY(0); }
-		}
-		.message.bot { 
-		    align-items: flex-start; 
-		}
-		.message.user { 
-		    align-items: flex-end; 
-		}
-		
-		.message-bubble { 
-		    max-width: 85%; 
-		    padding: 12px 16px; 
-		    border-radius: 16px; 
-		    font-size: 0.85rem; 
-		    line-height: 1.6; 
-		    word-wrap: break-word;
-		    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-		}
-		.message.bot .message-bubble { 
-		    background: white; 
-		    color: #1a2a3a; 
-		    border-bottom-left-radius: 4px; 
-		    border: 1px solid #e8edf2;
-		}
-		.message.bot .message-bubble strong {
-		    color: #1a5c6e;
-		}
-		.message.bot .message-bubble br {
-		    display: block;
-		    content: "";
-		    margin: 4px 0;
-		}
-		.message.user .message-bubble { 
-		    background: linear-gradient(135deg, #1a5c6e, #0a2e3f); 
-		    color: white; 
-		    border-bottom-right-radius: 4px; 
-		    box-shadow: 0 2px 12px rgba(26,92,110,0.25);
-		}
-		
-		.ai-typing {
-		    display: flex;
-		    align-items: center;
-		    gap: 8px;
-		    padding: 8px 0;
-		}
-		.ai-typing span {
-		    display: inline-block;
-		    width: 8px;
-		    height: 8px;
-		    background: #1a5c6e;
-		    border-radius: 50%;
-		    animation: typing 1.2s infinite ease-in-out;
-		}
-		.ai-typing span:nth-child(2) { animation-delay: 0.2s; }
-		.ai-typing span:nth-child(3) { animation-delay: 0.4s; }
-		@keyframes typing {
-		    0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
-		    30% { transform: translateY(-8px); opacity: 1; }
-		}
-		
-		.ai-input-area { 
-		    display: flex; 
-		    padding: 12px 16px; 
-		    border-top: 1px solid #e8edf2; 
-		    background: white; 
-		    gap: 10px; 
-		    flex-shrink: 0;
-		    align-items: center;
-		}
-		.ai-input-area input { 
-		    flex: 1; 
-		    padding: 10px 16px; 
-		    border: 2px solid #e8edf2; 
-		    border-radius: 25px; 
-		    outline: none; 
-		    font-size: 0.85rem; 
-		    transition: all 0.3s;
-		    background: #f8fafc;
-		}
-		.ai-input-area input:focus { 
-		    border-color: #1a5c6e; 
-		    box-shadow: 0 0 0 4px rgba(26,92,110,0.1);
-		    background: white;
-		}
-		.ai-input-area input::placeholder {
-		    color: #a0b0c0;
-		    font-size: 0.8rem;
-		}
-		.ai-input-area button { 
-		    background: linear-gradient(135deg, #1a5c6e, #0a2e3f); 
-		    border: none; 
-		    color: white; 
-		    padding: 10px 22px; 
-		    border-radius: 25px; 
-		    cursor: pointer; 
-		    font-weight: 600;
-		    font-size: 0.85rem;
-		    transition: all 0.3s;
-		    white-space: nowrap;
-		    letter-spacing: 0.3px;
-		}
-		.ai-input-area button:hover { 
-		    transform: translateY(-2px); 
-		    box-shadow: 0 4px 16px rgba(26,92,110,0.3);
-		}
-		.ai-input-area button:active {
-		    transform: scale(0.95);
-		}
-		
-		/* Mobile responsiveness */
-		@media (max-width: 768px) {
-		    .ai-chat-window {
-		        width: 92vw;
-		        height: 80vh;
-		        right: 4vw;
-		        bottom: 100px;
-		        border-radius: 16px;
-		    }
-		    .ai-chat-header {
-		        padding: 14px 16px;
-		    }
-		    .ai-chat-header h4 {
-		        font-size: 14px;
-		    }
-		    .ai-quick-actions button {
-		        font-size: 10px;
-		        padding: 3px 10px;
-		    }
-		    .ai-messages {
-		        padding: 12px 14px;
-		    }
-		    .message-bubble {
-		        font-size: 0.8rem;
-		        padding: 10px 14px;
-		    }
-		    .ai-input-area {
-		        padding: 10px 12px;
-		    }
-		    .ai-input-area input {
-		        font-size: 0.8rem;
-		        padding: 8px 14px;
-		    }
-		    .ai-input-area button {
-		        font-size: 0.8rem;
-		        padding: 8px 16px;
-		    }
-		}
-		
+           AI ASSISTANT - PROFESSIONAL CHAT DESIGN
+           ============================================================ */
+        .ai-assistant { 
+            position: fixed; 
+            bottom: 30px; 
+            right: 30px; 
+            cursor: pointer; 
+            z-index: 1000; 
+            transition: all 0.3s ease; 
+        }
+        .ai-avatar { 
+            width: 70px; 
+            height: 70px; 
+            background: linear-gradient(135deg, #0a2e3f, #1a5c6e); 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3); 
+            transition: all 0.3s; 
+            border: 3px solid white; 
+            animation: pulse-ai 2s infinite; 
+        }
+        .ai-avatar:hover { 
+            transform: scale(1.1) rotate(-5deg); 
+            box-shadow: 0 12px 40px rgba(26,92,110,0.4); 
+        }
+        .ai-avatar span { 
+            font-size: 36px; 
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.2)); 
+        }
+        @keyframes pulse-ai { 
+            0% { box-shadow: 0 0 0 0 rgba(26,92,110,0.4); } 
+            70% { box-shadow: 0 0 0 20px rgba(26,92,110,0); } 
+            100% { box-shadow: 0 0 0 0 rgba(26,92,110,0); } 
+        }
+        
+        .ai-chat-window { 
+            position: fixed; 
+            bottom: 110px; 
+            right: 30px; 
+            width: 400px; 
+            height: 600px; 
+            background: white; 
+            border-radius: 20px; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25); 
+            display: none; 
+            flex-direction: column; 
+            overflow: hidden; 
+            z-index: 1001; 
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .ai-chat-header { 
+            background: linear-gradient(135deg, #0a2e3f, #1a5c6e); 
+            color: white; 
+            padding: 16px 20px; 
+            display: flex; 
+            flex-direction: column;
+            justify-content: space-between; 
+            align-items: stretch; 
+            cursor: move; 
+            border-bottom: 3px solid rgba(255,255,255,0.1);
+            flex-shrink: 0;
+        }
+        .ai-chat-header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .ai-chat-header h4 { 
+            margin: 0; 
+            font-size: 16px; 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        .ai-chat-header h4 span {
+            background: rgba(255,255,255,0.15);
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+        }
+        .ai-chat-header button { 
+            background: rgba(255,255,255,0.2); 
+            border: none; 
+            color: white; 
+            border-radius: 50%; 
+            width: 32px; 
+            height: 32px; 
+            cursor: pointer; 
+            font-size: 18px; 
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .ai-chat-header button:hover { 
+            background: rgba(255,255,255,0.35); 
+            transform: rotate(90deg);
+        }
+        
+        .ai-quick-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .ai-quick-actions button {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: none;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+        }
+        .ai-quick-actions button:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .ai-quick-actions button:active {
+            transform: scale(0.95);
+        }
+        
+        .ai-messages { 
+            flex: 1; 
+            padding: 16px 18px; 
+            overflow-y: auto; 
+            background: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .ai-messages::-webkit-scrollbar {
+            width: 5px;
+        }
+        .ai-messages::-webkit-scrollbar-track {
+            background: #e8edf2;
+            border-radius: 10px;
+        }
+        .ai-messages::-webkit-scrollbar-thumb {
+            background: #1a5c6e;
+            border-radius: 10px;
+        }
+        
+        .message { 
+            margin-bottom: 4px; 
+            display: flex; 
+            flex-direction: column; 
+            animation: fadeInUp 0.3s ease;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message.bot { 
+            align-items: flex-start; 
+        }
+        .message.user { 
+            align-items: flex-end; 
+        }
+        
+        .message-bubble { 
+            max-width: 85%; 
+            padding: 12px 16px; 
+            border-radius: 16px; 
+            font-size: 0.85rem; 
+            line-height: 1.6; 
+            word-wrap: break-word;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .message.bot .message-bubble { 
+            background: white; 
+            color: #1a2a3a; 
+            border-bottom-left-radius: 4px; 
+            border: 1px solid #e8edf2;
+        }
+        .message.bot .message-bubble strong {
+            color: #1a5c6e;
+        }
+        .message.bot .message-bubble br {
+            display: block;
+            content: "";
+            margin: 4px 0;
+        }
+        .message.user .message-bubble { 
+            background: linear-gradient(135deg, #1a5c6e, #0a2e3f); 
+            color: white; 
+            border-bottom-right-radius: 4px; 
+            box-shadow: 0 2px 12px rgba(26,92,110,0.25);
+        }
+        
+        .ai-typing {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 0;
+        }
+        .ai-typing span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #1a5c6e;
+            border-radius: 50%;
+            animation: typing 1.2s infinite ease-in-out;
+        }
+        .ai-typing span:nth-child(2) { animation-delay: 0.2s; }
+        .ai-typing span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
+            30% { transform: translateY(-8px); opacity: 1; }
+        }
+        
+        .ai-input-area { 
+            display: flex; 
+            padding: 12px 16px; 
+            border-top: 1px solid #e8edf2; 
+            background: white; 
+            gap: 10px; 
+            flex-shrink: 0;
+            align-items: center;
+        }
+        .ai-input-area input { 
+            flex: 1; 
+            padding: 10px 16px; 
+            border: 2px solid #e8edf2; 
+            border-radius: 25px; 
+            outline: none; 
+            font-size: 0.85rem; 
+            transition: all 0.3s;
+            background: #f8fafc;
+        }
+        .ai-input-area input:focus { 
+            border-color: #1a5c6e; 
+            box-shadow: 0 0 0 4px rgba(26,92,110,0.1);
+            background: white;
+        }
+        .ai-input-area input::placeholder {
+            color: #a0b0c0;
+            font-size: 0.8rem;
+        }
+        .ai-input-area button { 
+            background: linear-gradient(135deg, #1a5c6e, #0a2e3f); 
+            border: none; 
+            color: white; 
+            padding: 10px 22px; 
+            border-radius: 25px; 
+            cursor: pointer; 
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.3s;
+            white-space: nowrap;
+            letter-spacing: 0.3px;
+        }
+        .ai-input-area button:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 16px rgba(26,92,110,0.3);
+        }
+        .ai-input-area button:active {
+            transform: scale(0.95);
+        }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .ai-chat-window {
+                width: 92vw;
+                height: 80vh;
+                right: 4vw;
+                bottom: 100px;
+                border-radius: 16px;
+            }
+            .ai-chat-header {
+                padding: 14px 16px;
+            }
+            .ai-chat-header h4 {
+                font-size: 14px;
+            }
+            .ai-quick-actions button {
+                font-size: 10px;
+                padding: 3px 10px;
+            }
+            .ai-messages {
+                padding: 12px 14px;
+            }
+            .message-bubble {
+                font-size: 0.8rem;
+                padding: 10px 14px;
+            }
+            .ai-input-area {
+                padding: 10px 12px;
+            }
+            .ai-input-area input {
+                font-size: 0.8rem;
+                padding: 8px 14px;
+            }
+            .ai-input-area button {
+                font-size: 0.8rem;
+                padding: 8px 16px;
+            }
+        }
+        
         .header { background: linear-gradient(135deg, #0a2e3f, #166b5c); padding: 18px 24px; color: white; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
         .title-section h1 { font-size: 1.4rem; font-weight: 700; }
         .title-section .subtitle { font-size: 0.7rem; opacity: 0.85; margin-top: 4px; }
@@ -813,11 +887,11 @@
         .sync-dot { width: 10px; height: 10px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 5px #4ade80; animation: pulse-green 2s infinite; }
         @keyframes pulse-green { 0% { opacity: 0.5; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } 100% { opacity: 0.5; transform: scale(0.8); } }
         @keyframes pulse-blue { 
-		    0% { opacity: 0.5; transform: scale(0.8); } 
-		    50% { opacity: 1; transform: scale(1.2); background: #57a0d2; box-shadow: 0 0 8px #57a0d2; } 
-		    100% { opacity: 0.5; transform: scale(0.8); } 
-		}
-		.refresh-btn { background: #2c6e5f !important; }
+            0% { opacity: 0.5; transform: scale(0.8); } 
+            50% { opacity: 1; transform: scale(1.2); background: #57a0d2; box-shadow: 0 0 8px #57a0d2; } 
+            100% { opacity: 0.5; transform: scale(0.8); } 
+        }
+        .refresh-btn { background: #2c6e5f !important; }
         
         .tabs { display: flex; gap: 0; background: #e2e8f0; padding: 0 20px; overflow-x: auto; }
         .tab { padding: 12px 24px; font-weight: 600; background: transparent; border: none; cursor: pointer; font-size: 0.85rem; color: #2d3748; border-radius: 20px 20px 0 0; }
@@ -969,13 +1043,14 @@ async function updateSitePassword() {
     updateBtn.textContent = '⏳ Updating...';
     
     try {
-        // Call the Supabase RPC function
-        var response = await fetch(SUPABASE_URL + '/rest/v1/rpc/update_site_password', {
+        // Call the Supabase RPC function using the config
+        const CONFIG = window.__CONFIG__ || {};
+        const response = await fetch(CONFIG.SUPABASE_URL + '/rest/v1/rpc/update_site_password', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                'apikey': CONFIG.SUPABASE_ANON_KEY,
+                'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY
             },
             body: JSON.stringify({ 
                 new_password: newPwd 
@@ -983,7 +1058,6 @@ async function updateSitePassword() {
         });
         
         if (!response.ok) {
-            // Try to get error details
             var errorText = await response.text();
             throw new Error('HTTP ' + response.status + ': ' + errorText);
         }
@@ -1076,17 +1150,23 @@ async function runPasswordTest() {
     resultDiv.innerHTML = '⏳ Verifying...';
     resultDiv.style.color = '#1a5c6e';
     
-    verifyPasswordWithSupabase(testPwd, function(isValid) {
-        if (isValid) {
-            resultDiv.innerHTML = '✅ Password is CORRECT!';
-            resultDiv.style.color = '#00a86b';
-            resultDiv.style.fontWeight = 'bold';
-        } else {
-            resultDiv.innerHTML = '❌ Password is INCORRECT';
-            resultDiv.style.color = '#dc3545';
-            resultDiv.style.fontWeight = 'bold';
-        }
-    });
+    // Use the global verifyPasswordWithSupabase function from the config loader
+    if (typeof window.verifyPasswordWithSupabase === 'function') {
+        window.verifyPasswordWithSupabase(testPwd, function(isValid) {
+            if (isValid) {
+                resultDiv.innerHTML = '✅ Password is CORRECT!';
+                resultDiv.style.color = '#00a86b';
+                resultDiv.style.fontWeight = 'bold';
+            } else {
+                resultDiv.innerHTML = '❌ Password is INCORRECT';
+                resultDiv.style.color = '#dc3545';
+                resultDiv.style.fontWeight = 'bold';
+            }
+        });
+    } else {
+        resultDiv.innerHTML = '❌ Verification function not available. Please refresh the page.';
+        resultDiv.style.color = '#dc3545';
+    }
 }
 
 /**
@@ -1117,7 +1197,10 @@ document.getElementById('testPasswordInput').addEventListener('keypress', functi
     }
 });
 </script>
-	
+
+<!-- ============================================================ -->
+<!-- LOGIN PAGE - UNCHANGED                                        -->
+<!-- ============================================================ -->
 <div id="loginPage" class="login-container">
     <div class="login-card">
         <div class="login-icon">🔬⚡</div>
@@ -1130,6 +1213,9 @@ document.getElementById('testPasswordInput').addEventListener('keypress', functi
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- AI ASSISTANT - UNCHANGED                                     -->
+<!-- ============================================================ -->
 <div id="aiAssistant" class="ai-assistant"><div class="ai-avatar"><span>🤖👷</span></div></div>
 <div id="aiChatWindow" class="ai-chat-window">
     <div class="ai-chat-header" id="aiChatHeader">
@@ -1141,16 +1227,16 @@ document.getElementById('testPasswordInput').addEventListener('keypress', functi
             <button id="closeAiChat" title="Close chat">✕</button>
         </div>
         <div class="ai-quick-actions">
-		    <button onclick="document.getElementById('aiInput').value='help';sendAIMessage();">💡 Help</button>
-		    <button onclick="document.getElementById('aiInput').value='how to in';sendAIMessage();">📥 IN</button>
-		    <button onclick="document.getElementById('aiInput').value='how to out';sendAIMessage();">📤 OUT</button>
-		    <button onclick="document.getElementById('aiInput').value='statistics';sendAIMessage();">📊 Stats</button>
-		    <button onclick="document.getElementById('aiInput').value='photos';sendAIMessage();">📸 Photos</button>
-		    <button onclick="document.getElementById('aiInput').value='poke';sendAIMessage();">🔔 Poke</button>
-		    <button onclick="document.getElementById('aiInput').value='compare';sendAIMessage();">📊 Compare</button>
-		    <button onclick="document.getElementById('aiInput').value='troubleshooting';sendAIMessage();">🔧 Fix</button>
-		    <button onclick="document.getElementById('aiInput').value='introduction';sendAIMessage();">ℹ️ Intro</button>
-		</div>
+            <button onclick="document.getElementById('aiInput').value='help';sendAIMessage();">💡 Help</button>
+            <button onclick="document.getElementById('aiInput').value='how to in';sendAIMessage();">📥 IN</button>
+            <button onclick="document.getElementById('aiInput').value='how to out';sendAIMessage();">📤 OUT</button>
+            <button onclick="document.getElementById('aiInput').value='statistics';sendAIMessage();">📊 Stats</button>
+            <button onclick="document.getElementById('aiInput').value='photos';sendAIMessage();">📸 Photos</button>
+            <button onclick="document.getElementById('aiInput').value='poke';sendAIMessage();">🔔 Poke</button>
+            <button onclick="document.getElementById('aiInput').value='compare';sendAIMessage();">📊 Compare</button>
+            <button onclick="document.getElementById('aiInput').value='troubleshooting';sendAIMessage();">🔧 Fix</button>
+            <button onclick="document.getElementById('aiInput').value='introduction';sendAIMessage();">ℹ️ Intro</button>
+        </div>
     </div>
     <div class="ai-messages" id="aiMessages">
         <div class="message bot">
@@ -1175,50 +1261,53 @@ document.getElementById('testPasswordInput').addEventListener('keypress', functi
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- APP CONTAINER - UNCHANGED                                    -->
+<!-- ============================================================ -->
 <div id="appContainer" class="app-container">
     <div class="header">
         <div class="title-section"><h1>🔧⚙️ NTWC MPU DR Workshop Equipment Database</h1><div class="subtitle">Equipment and Tools Management | QA/AT/Maintenance</div></div>
         <div class="digital-clock">
-    		<div class="time" id="liveTime">--:--:--</div>
-    		<div class="date" id="liveDate">----/--/--</div>
-		</div>
-		<div id="pokeNotification" style="position:relative; cursor:pointer; background:rgba(255,255,255,0.15); padding:6px 14px; border-radius:50px;" onclick="window.showPokeDetails && window.showPokeDetails();">
-		    <span>🔔</span>
-		    <span id="pokeCount" style="font-weight:bold; color:#ff6b6b;">0</span>
-		    <span style="font-size:0.7rem;">pokes</span>
-		</div>
-		<div class="action-group">
+            <div class="time" id="liveTime">--:--:--</div>
+            <div class="date" id="liveDate">----/--/--</div>
+        </div>
+        <div id="pokeNotification" style="position:relative; cursor:pointer; background:rgba(255,255,255,0.15); padding:6px 14px; border-radius:50px;" onclick="window.showPokeDetails && window.showPokeDetails();">
+            <span>🔔</span>
+            <span id="pokeCount" style="font-weight:bold; color:#ff6b6b;">0</span>
+            <span style="font-size:0.7rem;">pokes</span>
+        </div>
+        <div class="action-group">
             <button id="refreshBtn" class="refresh-btn">🔄 Refresh</button>
             <button id="accountBtn">👤 Account</button>
             <button id="backupBtn" class="admin-only" style="display:inline-block;">💾 Backup</button>
             <button id="restoreBtn" class="admin-only" style="display:inline-block;">📂 Restore</button>
-			<button id="supabaseBackupBtn" class="admin-only" style="display:inline-block;">☁️ Supabase Backup</button>
+            <button id="supabaseBackupBtn" class="admin-only" style="display:inline-block;">☁️ Supabase Backup</button>
             <button id="logoutBtn">🚪 Logout</button>
             <div class="sync-status"><span class="sync-dot"></span><span id="syncStatusText">Live Sync</span></div>
-			<div class="sync-status" style="position:relative; display:flex; align-items:center; gap:6px;">
-			    <span class="sync-dot" style="background:#1a5c6e; box-shadow:0 0 5px #4169e1; animation: pulse-blue 2s infinite;"></span>
-			    <span id="syncStatusText">Live Sync</span>
-			    <span id="photoSyncStatus" style="font-size:0.6rem; margin-left:5px; color:#4169e1;">📸</span>
-			</div>
+            <div class="sync-status" style="position:relative; display:flex; align-items:center; gap:6px;">
+                <span class="sync-dot" style="background:#1a5c6e; box-shadow:0 0 5px #4169e1; animation: pulse-blue 2s infinite;"></span>
+                <span id="syncStatusText">Live Sync</span>
+                <span id="photoSyncStatus" style="font-size:0.6rem; margin-left:5px; color:#4169e1;">📸</span>
+            </div>
         </div>
     </div>
     <div class="tabs"><button class="tab active" data-page="home">📋 Equipment DB</button><button class="tab" data-page="record">✍️ In/Out Record</button><button class="tab" data-page="history">📜 History Logs</button><button id="dblogsTab" class="tab" data-page="dblogs">📊 DB Logs</button></div>
 
     <div id="homePage" class="page active">
-		<div class="filter-bar">
-		    <input type="text" id="equipSearch" placeholder="🔍 Search">
-		    <select id="filterLocation"></select>
-		    <select id="filterParentAsset"></select>
-		    <select id="filterStatus"><option value="">All Status</option><option value="IN">IN</option><option value="OUT">OUT</option></select>
-		    <button id="clearSearchBtn" class="btn">Clear Filter</button>
-		    <span id="selectedCountBadge" style="background:#e2e8f0; padding:4px 12px; border-radius:40px;">0 selected</span>
-		    <button id="clearSelEquipBtn" class="btn btn-sm">Clear</button>
-		    <button id="selectAllEquipBtn" class="btn btn-sm">Select All</button>
-		    <button id="addNewEquipBtn" class="btn btn-primary btn-sm">➕ Add New</button>
-		    <button id="compareBtn" class="btn btn-primary btn-sm" style="background:#e67e22;">📊 Compare</button>
-		    <button id="compareStatBtn" class="btn btn-primary btn-sm admin-only" style="background:#8e44ad; display:none;">📈 Compare Stat</button>
-		</div>
-		<div class="table-wrapper"><table id="equipTable"><thead><tr><th style="width:30px">Select</th><th>Asset #</th><th>Description</th><th>Manufacturer</th><th>Serial #</th><th>Location</th><th>Parent</th><th>Status</th><th>Photo</th><th>Actions</th></tr></thead><tbody id="equipTableBody"></tbody></table></div>
+        <div class="filter-bar">
+            <input type="text" id="equipSearch" placeholder="🔍 Search">
+            <select id="filterLocation"></select>
+            <select id="filterParentAsset"></select>
+            <select id="filterStatus"><option value="">All Status</option><option value="IN">IN</option><option value="OUT">OUT</option></select>
+            <button id="clearSearchBtn" class="btn">Clear Filter</button>
+            <span id="selectedCountBadge" style="background:#e2e8f0; padding:4px 12px; border-radius:40px;">0 selected</span>
+            <button id="clearSelEquipBtn" class="btn btn-sm">Clear</button>
+            <button id="selectAllEquipBtn" class="btn btn-sm">Select All</button>
+            <button id="addNewEquipBtn" class="btn btn-primary btn-sm">➕ Add New</button>
+            <button id="compareBtn" class="btn btn-primary btn-sm" style="background:#e67e22;">📊 Compare</button>
+            <button id="compareStatBtn" class="btn btn-primary btn-sm admin-only" style="background:#8e44ad; display:none;">📈 Compare Stat</button>
+        </div>
+        <div class="table-wrapper"><table id="equipTable"><thead><tr><th style="width:30px">Select</th><th>Asset #</th><th>Description</th><th>Manufacturer</th><th>Serial #</th><th>Location</th><th>Parent</th><th>Status</th><th>Photo</th><th>Actions</th></tr></thead><tbody id="equipTableBody"></tbody></table></div>
     </div>
 
     <div id="recordPage" class="page">
@@ -1230,18 +1319,18 @@ document.getElementById('testPasswordInput').addEventListener('keypress', functi
                 <div class="form-group"><label>📝 Others</label><input type="text" id="othersNames" placeholder="Deputizing name etc."></div>
                 <div class="form-group"><label>💬 Remarks</label><input type="text" id="remarksField" placeholder="Additional remarks"></div></div>
             <div>
-			    <label style="font-weight:600; font-size:0.85rem;">✍️ Certificated Sr. Electrical Technician: </span></label>
-			    <canvas id="signatureCanvas" width="400" height="100"></canvas>
-			    <div><button id="clearSignatureBtn" class="btn btn-sm">Clear Signature</button></div>
-			</div>
-			<div style="display: flex; gap: 12px; margin-top: 16px;"><button id="previewRecordBtn" class="btn btn-primary">🔍 Preview</button><button id="saveRecordBtn" class="btn btn-primary">💾 Save Record</button><button id="clearFormBtnRecord" class="btn">🗑️ Clear</button></div>
+                <label style="font-weight:600; font-size:0.85rem;">✍️ Certificated Sr. Electrical Technician: </span></label>
+                <canvas id="signatureCanvas" width="400" height="100"></canvas>
+                <div><button id="clearSignatureBtn" class="btn btn-sm">Clear Signature</button></div>
+            </div>
+            <div style="display: flex; gap: 12px; margin-top: 16px;"><button id="previewRecordBtn" class="btn btn-primary">🔍 Preview</button><button id="saveRecordBtn" class="btn btn-primary">💾 Save Record</button><button id="clearFormBtnRecord" class="btn">🗑️ Clear</button></div>
         </div>
         <div style="background:#f9fbfe; border-radius:20px; padding:16px; margin-top:16px;"><h4>📌 Selected Equipment</h4><div id="selectedEquipList" style="font-size:0.7rem; max-height:120px; overflow-y:auto;"></div></div>
     </div>
 
     <div id="historyPage" class="page">
         <div class="filter-bar"><input type="text" id="historySearch" placeholder="🔍 Filter"><select id="histFilterPurpose"><option value="">Job Type</option><option value="PM">PM</option><option value="CM">CM</option><option value="QA">QA</option><option value="AT">AT</option><option value="OTH">OTH</option></select><select id="histFilterStatus"><option value="">Status</option><option value="IN">IN</option><option value="OUT">OUT</option></select><select id="histFilterRecordStatus"><option value="">Record Status</option><option value="Verified">Verified</option><option value="Edited">Edited</option></select>
-	    <input type="date" id="historyStartDate" style="width:130px;"><input type="date" id="historyEndDate" style="width:130px;"><span style="font-size:0.7rem; color:#666;">to</span>
+        <input type="date" id="historyStartDate" style="width:130px;"><input type="date" id="historyEndDate" style="width:130px;"><span style="font-size:0.7rem; color:#666;">to</span>
             <div style="display:flex; gap:8px; align-items:center;"><span style="font-size:0.7rem;">Sort by Date:</span><button id="sortHistoryAscBtn" class="btn btn-sm">⬆️ Ascending</button><button id="sortHistoryDescBtn" class="btn btn-sm">⬇️ Descending</button></div>
             <button id="resetHistoryFiltersBtn" class="btn">Reset</button><button id="exportBtn" class="btn-primary btn">📎 Export</button></div>
         <div class="table-wrapper"><table style="min-width:950px;"><thead><tr><th>Timestamp</th><th>Equipment(s) Details</th><th>Status</th><th>Job Type</th><th>Purpose</th><th>ET/SET/Phy</th><th>Record Status</th><th>Edit History</th><th>Actions</th><tr></thead><tbody id="historyBody"></tbody></table></div>
@@ -1249,35 +1338,41 @@ document.getElementById('testPasswordInput').addEventListener('keypress', functi
 
     <div id="dblogsPage" class="page">
         <div class="filter-bar"><input type="text" id="dbLogSearch" placeholder="🔍 Filter logs">
-	<select id="dbLogActionFilter">
-	    <option value="">All Actions</option>
-	    <option value="EQUIPMENT_ADDED">➕ Equipment Added</option>
-	    <option value="EQUIPMENT_EDITED">🔧 Equipment Edited</option>
-	    <!-- These options are hidden for Senior Super-user, but available for Admin -->
-	    <option value="LOGIN_SUCCESS" class="admin-only-action">✅ Login Success</option>
-	    <option value="LOGIN_FAILED" class="admin-only-action">❌ Login Failed</option>
-	    <option value="LOGOUT" class="admin-only-action">🚪 Logout</option>
-	    <option value="SESSION_START" class="admin-only-action">🔄 Session Start</option>
-	    <option value="USER_CREATED" class="admin-only-action">👤 User Created</option>
-	    <option value="PASSWORD_CHANGED" class="admin-only-action">🔑 Password Changed</option>
-	    <option value="RECORD_CREATED" class="admin-only-action">📝 Record Created</option>
-	    <option value="RECORD_EDITED" class="admin-only-action">✏️ Record Edited</option>
-	    <option value="BACKUP" class="admin-only-action">💾 Backup</option>
-	    <option value="RESTORE" class="admin-only-action">📂 Restore</option>
-	    <option value="SUPABASE_BACKUP" class="admin-only-action">☁️ Supabase Backup</option>
-	    <option value="POKE_SENT" class="admin-only-action">🔔 Poke Sent</option>
-	    <option value="POKE_BACK" class="admin-only-action">🔁 Poke Back</option>
-	</select>
-	<input type="date" id="dbLogStartDate" style="width:130px;">
-	<input type="date" id="dbLogEndDate" style="width:130px;">
-	<span style="font-size:0.7rem; color:#666;">to</span>
+    <select id="dbLogActionFilter">
+        <option value="">All Actions</option>
+        <option value="EQUIPMENT_ADDED">➕ Equipment Added</option>
+        <option value="EQUIPMENT_EDITED">🔧 Equipment Edited</option>
+        <option value="LOGIN_SUCCESS" class="admin-only-action">✅ Login Success</option>
+        <option value="LOGIN_FAILED" class="admin-only-action">❌ Login Failed</option>
+        <option value="LOGOUT" class="admin-only-action">🚪 Logout</option>
+        <option value="SESSION_START" class="admin-only-action">🔄 Session Start</option>
+        <option value="USER_CREATED" class="admin-only-action">👤 User Created</option>
+        <option value="PASSWORD_CHANGED" class="admin-only-action">🔑 Password Changed</option>
+        <option value="RECORD_CREATED" class="admin-only-action">📝 Record Created</option>
+        <option value="RECORD_EDITED" class="admin-only-action">✏️ Record Edited</option>
+        <option value="BACKUP" class="admin-only-action">💾 Backup</option>
+        <option value="RESTORE" class="admin-only-action">📂 Restore</option>
+        <option value="SUPABASE_BACKUP" class="admin-only-action">☁️ Supabase Backup</option>
+        <option value="POKE_SENT" class="admin-only-action">🔔 Poke Sent</option>
+        <option value="POKE_BACK" class="admin-only-action">🔁 Poke Back</option>
+    </select>
+    <input type="date" id="dbLogStartDate" style="width:130px;">
+    <input type="date" id="dbLogEndDate" style="width:130px;">
+    <span style="font-size:0.7rem; color:#666;">to</span>
             <div style="display:flex; gap:8px; align-items:center;"><span style="font-size:0.7rem;">Sort by Date:</span><button id="sortDbLogsAscBtn" class="btn btn-sm">⬆️ Ascending</button><button id="sortDbLogsDescBtn" class="btn btn-sm">⬇️ Descending</button></div>
             <button id="resetDbLogsBtn" class="btn">Reset</button><button id="exportDbLogsBtn" class="btn-primary btn">📎 Export Logs</button></div>
         <div class="table-wrapper"><table style="min-width:900px;"><thead><tr><th>Timestamp</th><th>Action Type</th><th>Record ID</th><th>Equipment/Details</th><th>User</th><th>Action Timestamp</th><th>Reason/Note</th><tr></thead><tbody id="dbLogsBody"></tbody></table></div>
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- MAIN APPLICATION SCRIPT                                       -->
+<!-- ============================================================ -->
 <script>
+// ============================================================
+// MAIN APPLICATION - Uses config for Supabase credentials
+// ============================================================
+
 // Clean up any existing subscriptions when page loads
 window.addEventListener('beforeunload', function() {
     if (window.pokeSubscription) {
@@ -1293,10 +1388,59 @@ window.addEventListener('beforeunload', function() {
         window.pokePollingInterval = null;
     }
 });
+
 (function() {
-    const supabaseUrl = 'https://qhuqlhzvpmhykkmmqtth.supabase.co';
-    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFodXFsaHp2cG1oeWtrbW1xdHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMTM0OTQsImV4cCI6MjA5Njc4OTQ5NH0.pTTY4irj4vx-us8W1DyYaEB6ug_wEjuwNdy0lJjh_-8';
+    // ============================================================
+    // GET CONFIGURATION FROM WINDOW OBJECT
+    // ============================================================
+    const CONFIG = window.__CONFIG__ || {};
+    
+    // Validate config
+    if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
+        console.error('❌ Configuration not available for main app');
+        alert('Configuration error. Please contact administrator.');
+        return;
+    }
+    
+    console.log('✅ Main app using configuration:', {
+        url: CONFIG.SUPABASE_URL,
+        env: CONFIG.APP_ENV,
+        debug: CONFIG.ENABLE_DEBUG
+    });
+    
+    // ============================================================
+    // SUPABASE CLIENT - USING CONFIG
+    // ============================================================
+    const supabaseUrl = CONFIG.SUPABASE_URL;
+    const supabaseAnonKey = CONFIG.SUPABASE_ANON_KEY;
     const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+    
+    // Make supabaseClient globally available
+    window.supabaseClient = supabaseClient;
+    
+    // ============================================================
+    // ALL YOUR EXISTING JAVASCRIPT CODE GOES HERE
+    // ============================================================
+    // COPY EVERYTHING FROM YOUR ORIGINAL SCRIPT SECTION
+    // FROM THE LINE: let currentUser = null, currentUserRole = null;
+    // TO THE END OF THE FILE
+    
+    // ============================================================
+    // THE ONLY CHANGE IS: REMOVE the hardcoded supabaseUrl and 
+    // supabaseAnonKey declarations, and use CONFIG instead.
+    // ============================================================
+    
+    // Instead of:
+    // const supabaseUrl = 'https://qhuqlhzvpmhykkmmqtth.supabase.co';
+    // const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+    
+    // You now use:
+    // const supabaseUrl = CONFIG.SUPABASE_URL;
+    // const supabaseAnonKey = CONFIG.SUPABASE_ANON_KEY;
+    
+    // All other code remains exactly the same
+    
+    // ... YOUR ENTIRE EXISTING JAVASCRIPT CODE HERE ...
     
     let currentUser = null, currentUserRole = null;
     let equipmentData = [], equipStatus = {}, historyRecords = [], dbLogs = [];
