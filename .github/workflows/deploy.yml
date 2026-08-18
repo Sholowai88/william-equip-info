@@ -1,15 +1,12 @@
-# .github/workflows/deploy.yml
 name: Deploy with Secure Config
 
 on:
-  # Trigger on push to main branch
   push:
     branches:
       - main
-  # Allow manual trigger from Actions tab
   workflow_dispatch:
 
-# Permissions needed for deployment
+# Give the workflow permission to write to the repository
 permissions:
   contents: write
   pages: write
@@ -25,11 +22,12 @@ jobs:
       id-token: write
     
     steps:
-      # Step 1: Checkout your code
       - name: Checkout code
         uses: actions/checkout@v4
       
-      # Step 2: Create the config file from GitHub Secrets
+      - name: Create config directory
+        run: mkdir -p config
+      
       - name: Generate production config
         run: |
           echo "// ============================================================" > config.prod.js
@@ -45,7 +43,6 @@ jobs:
           echo "    ENABLE_DEBUG: false" >> config.prod.js
           echo "};" >> config.prod.js
           echo "" >> config.prod.js
-          echo "// Make it available globally" >> config.prod.js
           echo "if (typeof window !== 'undefined') {" >> config.prod.js
           echo "    window.__CONFIG__ = CONFIG;" >> config.prod.js
           echo "}" >> config.prod.js
@@ -55,22 +52,20 @@ jobs:
           echo "    module.exports = CONFIG;" >> config.prod.js
           echo "}" >> config.prod.js
           
-          echo "📄 Production config created successfully"
-          echo "✅ Config file content:"
-          head -20 config.prod.js
+          echo "✅ config.prod.js created successfully"
       
-      # Step 3: Verify the config file was created
       - name: Verify config file
         run: |
           if [ -f "config.prod.js" ]; then
             echo "✅ config.prod.js exists"
-            echo "📄 File size: $(wc -c < config.prod.js) bytes"
           else
             echo "❌ config.prod.js was not created!"
             exit 1
           fi
       
-      # Step 4: Deploy to GitHub Pages
+      - name: List files for debugging
+        run: ls -la
+      
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
@@ -83,9 +78,7 @@ jobs:
           commit_message: 'Deploy with secure configuration'
           force_orphan: true
       
-      # Step 5: Show deployment URL
       - name: Show deployment URL
         run: |
           echo "✅ Deployment complete!"
-          echo "🌐 Your site will be available at:"
-          echo "   https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          echo "🌐 https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
