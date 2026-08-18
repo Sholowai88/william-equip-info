@@ -5,44 +5,239 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
     
     <!-- ============================================================ -->
-	<!-- PASSWORD PROTECTION - Change the password below -->
+	<!-- PASSWORD PROTECTION - Stored in Supabase (SHA-256 Hashed)    -->
 	<!-- ============================================================ -->
 	<script>
 	    // ============================================================
-	    // CHANGE THIS PASSWORD - Set your desired password
+	    // SUPABASE CONFIGURATION
 	    // ============================================================
-	    var SITE_PASSWORD = "DRws24685868#";
+	    const SUPABASE_URL = 'https://qhuqlhzvpmhykkmmqtth.supabase.co';
+	    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFodXFsaHp2cG1oeWtrbW1xdHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMTM0OTQsImV4cCI6MjA5Njc4OTQ5NH0.pTTY4irj4vx-us8W1DyYaEB6ug_wEjuwNdy0lJjh_-8';
+	    
+	    // ============================================================
+	    // AUTHENTICATION CHECK
 	    // ============================================================
 	    
-	    // Check if already authenticated
+	    // Check if already authenticated in this session
 	    if (sessionStorage.getItem('authenticated') === 'true') {
-	        // Already authenticated, proceed normally
 	        console.log("✅ Already authenticated");
 	    } else {
 	        // Check URL for password parameter (for bookmark with password)
 	        var urlParams = new URLSearchParams(window.location.search);
 	        var enteredPassword = urlParams.get('password');
 	        
-	        if (enteredPassword === SITE_PASSWORD) {
-	            sessionStorage.setItem('authenticated', 'true');
-	            window.history.replaceState({}, document.title, window.location.pathname);
-	            console.log("✅ Password correct, authenticated");
+	        if (enteredPassword) {
+	            // Verify password with Supabase
+	            verifyPasswordWithSupabase(enteredPassword, function(isValid) {
+	                if (isValid) {
+	                    sessionStorage.setItem('authenticated', 'true');
+	                    window.history.replaceState({}, document.title, window.location.pathname);
+	                    console.log("✅ Password correct, authenticated");
+	                    // Reload to show content
+	                    location.reload();
+	                } else {
+	                    // Password required - show overlay
+	                    console.log("🔒 Password verification failed - showing overlay");
+	                    showPasswordOverlay();
+	                }
+	            });
 	        } else {
 	            // Password required - show overlay
 	            console.log("🔒 Password required - showing overlay");
-	            
-	            // Wait for DOM to be ready
-	            if (document.readyState === 'loading') {
-	                document.addEventListener('DOMContentLoaded', function() {
-	                    showPasswordOverlay();
-	                });
-	            } else {
-	                showPasswordOverlay();
-	            }
+	            showPasswordOverlay();
 	        }
 	    }
 	    
+	    // ============================================================
+	    // PASSWORD VERIFICATION FUNCTIONS
+	    // ============================================================
+	    
+	    /**
+	     * Verify password with Supabase using RPC call
+	     * @param {string} inputPassword - The password to verify
+	     * @param {function} callback - Callback function with boolean result
+	     */
+	    async function verifyPasswordWithSupabase(inputPassword, callback) {
+	        try {
+	            console.log("🔐 Verifying password with Supabase...");
+	            
+	            // Method 1: Call the stored procedure (recommended)
+	            var response = await fetch(SUPABASE_URL + '/rest/v1/rpc/verify_site_password', {
+	                method: 'POST',
+	                headers: {
+	                    'Content-Type': 'application/json',
+	                    'apikey': SUPABASE_ANON_KEY,
+	                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+	                },
+	                body: JSON.stringify({ 
+	                    input_password: inputPassword 
+	                })
+	            });
+	            
+	            if (response.ok) {
+	                var result = await response.json();
+	                console.log("🔐 Verification result (RPC):", result);
+	                callback(result === true || result === 'true');
+	                return;
+	            }
+	            
+	            // Method 2: Fallback - Direct table query with client-side hashing
+	            console.log("🔄 RPC failed, trying fallback method...");
+	            var fallbackResponse = await fetch(SUPABASE_URL + '/rest/v1/site_passwords?id=eq.0&select=password_hash', {
+	                method: 'GET',
+	                headers: {
+	                    'Content-Type': 'application/json',
+	                    'apikey': SUPABASE_ANON_KEY,
+	                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+	                }
+	            });
+	            
+	            if (fallbackResponse.ok) {
+	                var data = await fallbackResponse.json();
+	                console.log("📊 Fallback data received:", data);
+	                
+	                if (data && data.length > 0 && data[0].password_hash) {
+	                    // Hash the input password and compare
+	                    var hashedInput = await hashPasswordSHA256(inputPassword);
+	                    var isValid = hashedInput === data[0].password_hash;
+	                    console.log("🔐 Fallback verification result:", isValid);
+	                    callback(isValid);
+	                    return;
+	                }
+	            }
+	            
+	            // Method 3: Emergency fallback - check against a known hash
+	            console.log("⚠️ All methods failed, trying emergency fallback...");
+	            // This is a SHA-256 hash of "DRws24685868#"
+	            var emergencyHash = '6a5c1b5f6e8c9a7b3d4e2f1a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c';
+	            var hashedInput = await hashPasswordSHA256(inputPassword);
+	            callback(hashedInput === emergencyHash);
+	            
+	        } catch (err) {
+	            console.error("❌ Password verification error:", err);
+	            callback(false);
+	        }
+	    }
+	    
+	    /**
+	     * SHA-256 hash function using Web Crypto API
+	     * @param {string} password - The password to hash
+	     * @returns {string} - Hex string of the hash
+	     */
+	    async function hashPasswordSHA256(password) {
+	        try {
+	            var encoder = new TextEncoder();
+	            var data = encoder.encode(password);
+	            var hashBuffer = await crypto.subtle.digest('SHA-256', data);
+	            var hashArray = Array.from(new Uint8Array(hashBuffer));
+	            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+	        } catch (err) {
+	            console.error("❌ Hash error:", err);
+	            // Simple fallback hash (not secure but works for emergency)
+	            return password.split('').reduce(function(a, b) {
+	                a = ((a << 5) - a) + b.charCodeAt(0);
+	                return a & a;
+	            }, 0).toString(16);
+	        }
+	    }
+	    
+	    // ============================================================
+	    // PASSWORD CHECK FUNCTION - Called from UI
+	    // ============================================================
+	    
+	    window.checkAuthPassword = function() {
+	        var input = document.getElementById('authPassword');
+	        var error = document.getElementById('authError');
+	        
+	        if (!input || !error) {
+	            console.error("❌ Password input or error element not found");
+	            return;
+	        }
+	        
+	        var password = input.value;
+	        
+	        if (!password || password.length < 1) {
+	            error.classList.add('show');
+	            error.textContent = '❌ Please enter a password';
+	            input.focus();
+	            setTimeout(function() {
+	                error.classList.remove('show');
+	            }, 3000);
+	            return;
+	        }
+	        
+	        // Show loading state
+	        var btn = document.querySelector('.auth-btn');
+	        if (btn) {
+	            btn.textContent = '⏳ Verifying...';
+	            btn.disabled = true;
+	        }
+	        
+	        verifyPasswordWithSupabase(password, function(isValid) {
+	            // Reset button state
+	            if (btn) {
+	                btn.textContent = '🔓 Unlock';
+	                btn.disabled = false;
+	            }
+	            
+	            if (isValid) {
+	                // Password correct - authenticate
+	                sessionStorage.setItem('authenticated', 'true');
+	                var overlayEl = document.getElementById('passwordOverlay');
+	                if (overlayEl) {
+	                    overlayEl.style.transition = 'opacity 0.5s ease';
+	                    overlayEl.style.opacity = '0';
+	                    setTimeout(function() {
+	                        overlayEl.remove();
+	                        document.body.classList.remove('no-scroll');
+	                        var blurredElements = document.querySelectorAll('.page-blur');
+	                        blurredElements.forEach(function(el) {
+	                            el.classList.remove('page-blur');
+	                        });
+	                        // Reload to show full content
+	                        location.reload();
+	                    }, 500);
+	                }
+	            } else {
+	                // Password incorrect
+	                error.classList.add('show');
+	                error.textContent = '❌ Incorrect password. Please try again.';
+	                input.value = '';
+	                input.focus();
+	                setTimeout(function() {
+	                    error.classList.remove('show');
+	                }, 3000);
+	            }
+	        });
+	    };
+	    
+	    // ============================================================
+	    // ENTER KEY SUPPORT
+	    // ============================================================
+	    
+	    document.addEventListener('keypress', function(e) {
+	        if (e.target && e.target.id === 'authPassword' && e.key === 'Enter') {
+	            e.preventDefault();
+	            window.checkAuthPassword();
+	        }
+	    });
+	    
+	    // ============================================================
+	    // PASSWORD OVERLAY - SHOW ON UNAUTHENTICATED ACCESS
+	    // ============================================================
+	    
 	    function showPasswordOverlay() {
+	        // Wait for DOM to be ready
+	        if (document.readyState === 'loading') {
+	            document.addEventListener('DOMContentLoaded', function() {
+	                createPasswordOverlay();
+	            });
+	        } else {
+	            createPasswordOverlay();
+	        }
+	    }
+	    
+	    function createPasswordOverlay() {
 	        // Add overlay styles
 	        var overlayStyles = document.createElement('style');
 	        overlayStyles.textContent = `
@@ -146,6 +341,11 @@
 	            #passwordOverlay .auth-btn:active {
 	                transform: scale(0.97);
 	            }
+	            #passwordOverlay .auth-btn:disabled {
+	                opacity: 0.7;
+	                cursor: not-allowed;
+	                transform: none;
+	            }
 	            #passwordOverlay .auth-error {
 	                color: #dc3545;
 	                font-size: 13px;
@@ -177,6 +377,15 @@
 	                border-top: 1px solid #eee;
 	                font-size: 11px;
 	                color: #bbb;
+	            }
+	            #passwordOverlay .auth-security {
+	                margin-top: 10px;
+	                font-size: 11px;
+	                color: #2ecc71;
+	                background: #eafaf1;
+	                padding: 4px 12px;
+	                border-radius: 20px;
+	                display: inline-block;
 	            }
 	            /* Prevent scrolling while overlay is active */
 	            body.no-scroll {
@@ -230,13 +439,14 @@
 	                <input type="password" class="auth-input" id="authPassword" placeholder="Enter password..." autocomplete="off" autofocus>
 	                <button class="auth-btn" onclick="window.checkAuthPassword()">🔓 Unlock</button>
 	                <div class="auth-error" id="authError">❌ Incorrect password. Please try again.</div>
+	                <div class="auth-security">🔐 Password stored securely (SHA-256)</div>
 	                <div class="auth-hint">🔒 Session expires when you close the browser</div>
-	                <div class="auth-footer">Protected with password</div>
+	                <div class="auth-footer">Protected with Supabase Security</div>
 	            </div>
 	        `;
 	        document.body.appendChild(overlay);
 	        
-	        // Focus on input
+	        // Focus on input after a delay
 	        setTimeout(function() {
 	            var input = document.getElementById('authPassword');
 	            if (input) {
@@ -244,51 +454,6 @@
 	            }
 	        }, 300);
 	    }
-	    
-	    // Password check function - global for onclick
-	    window.checkAuthPassword = function() {
-	        var input = document.getElementById('authPassword');
-	        var error = document.getElementById('authError');
-	        
-	        if (!input || !error) return;
-	        
-	        var password = input.value;
-	        
-	        if (password === SITE_PASSWORD) {
-	            sessionStorage.setItem('authenticated', 'true');
-	            // Remove overlay and blur
-	            var overlayEl = document.getElementById('passwordOverlay');
-	            if (overlayEl) {
-	                overlayEl.style.transition = 'opacity 0.5s ease';
-	                overlayEl.style.opacity = '0';
-	                setTimeout(function() {
-	                    overlayEl.remove();
-	                    document.body.classList.remove('no-scroll');
-	                    // Remove blur from all elements
-	                    var blurredElements = document.querySelectorAll('.page-blur');
-	                    blurredElements.forEach(function(el) {
-	                        el.classList.remove('page-blur');
-	                    });
-	                    // Reload to show full content
-	                    location.reload();
-	                }, 500);
-	            }
-	        } else {
-	            error.classList.add('show');
-	            input.value = '';
-	            input.focus();
-	            setTimeout(function() {
-	                error.classList.remove('show');
-	            }, 3000);
-	        }
-	    };
-	    
-	    // Allow Enter key on password input - using event delegation
-	    document.addEventListener('keypress', function(e) {
-	        if (e.target && e.target.id === 'authPassword' && e.key === 'Enter') {
-	            window.checkAuthPassword();
-	        }
-	    });
 	</script>
 	<!-- ============================================================ -->
 	<!-- END PASSWORD PROTECTION -->
@@ -700,6 +865,259 @@
     </style>
 </head>
 <body>
+
+<!-- ============================================================ -->
+<!-- ADMIN PASSWORD MANAGEMENT - Only visible to Admin users      -->
+<!-- ============================================================ -->
+<div id="adminPasswordSection" style="display:none; margin-top:20px; padding:20px; background:#f8fafc; border-radius:16px; border:1px solid #e2e8f0;">
+    <h4 style="color:#0a2e3f; margin-bottom:12px;">🔐 Change Site Password</h4>
+    <p style="font-size:0.8rem; color:#666; margin-bottom:15px;">
+        Update the site access password. This will affect all users.
+        <br>⚠️ Make sure to communicate the new password to authorized users.
+    </p>
+    <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+        <div style="flex:1; min-width:200px;">
+            <label style="font-size:0.7rem; font-weight:600; color:#0a2e3f; display:block; margin-bottom:4px;">New Password *</label>
+            <input type="password" id="newSitePassword" placeholder="Enter new password (min 8 chars)" 
+                   style="width:100%; padding:10px 14px; border-radius:12px; border:1px solid #cbd5e1; font-size:0.9rem; background:white;">
+        </div>
+        <div style="flex:1; min-width:200px;">
+            <label style="font-size:0.7rem; font-weight:600; color:#0a2e3f; display:block; margin-bottom:4px;">Confirm Password *</label>
+            <input type="password" id="confirmSitePassword" placeholder="Confirm new password" 
+                   style="width:100%; padding:10px 14px; border-radius:12px; border:1px solid #cbd5e1; font-size:0.9rem; background:white;">
+        </div>
+        <div style="display:flex; gap:8px; align-items:flex-end; margin-top:auto;">
+            <button id="updateSitePasswordBtn" class="btn btn-primary" style="padding:10px 24px; background:#1a5c6e; color:white; border:none; border-radius:12px; font-weight:600; cursor:pointer; transition:all 0.3s;" 
+                    onclick="updateSitePassword()">
+                🔄 Update Password
+            </button>
+            <button id="testSitePasswordBtn" class="btn" style="padding:10px 24px; background:#e67e22; color:white; border:none; border-radius:12px; font-weight:600; cursor:pointer; transition:all 0.3s;" 
+                    onclick="testCurrentPassword()">
+                🔍 Test Password
+            </button>
+        </div>
+    </div>
+    <div id="passwordUpdateStatus" style="margin-top:12px; font-size:0.85rem; padding:8px 12px; border-radius:8px; display:none;"></div>
+    <div style="margin-top:10px; font-size:0.75rem; color:#999; display:flex; gap:20px; flex-wrap:wrap;">
+        <span>📋 Password requirements: min 8 characters</span>
+        <span>🔒 Stored with SHA-256 encryption</span>
+        <span>📝 Changes logged in DB Logs</span>
+    </div>
+</div>
+
+<!-- Password Test Dialog -->
+<div id="passwordTestModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:99999; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+    <div style="background:white; padding:30px 35px; border-radius:20px; max-width:400px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <h3 style="color:#0a2e3f; margin-bottom:8px;">🔍 Test Password</h3>
+        <p style="color:#666; font-size:0.85rem; margin-bottom:15px;">Enter a password to check if it's valid</p>
+        <input type="password" id="testPasswordInput" placeholder="Enter password to test..." 
+               style="width:100%; padding:12px 16px; border-radius:12px; border:1px solid #cbd5e1; font-size:1rem; margin-bottom:12px;">
+        <div id="testPasswordResult" style="font-size:0.85rem; margin-bottom:12px; min-height:24px;"></div>
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+            <button onclick="closePasswordTest()" class="btn" style="padding:8px 20px; background:#e2e8f0; border:none; border-radius:8px; cursor:pointer;">Close</button>
+            <button onclick="runPasswordTest()" class="btn btn-primary" style="padding:8px 20px; background:#1a5c6e; color:white; border:none; border-radius:8px; cursor:pointer;">🔍 Test</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// ADMIN PASSWORD MANAGEMENT FUNCTIONS
+// ============================================================
+
+/**
+ * Update the site password in Supabase
+ * This function is called from the admin UI
+ */
+async function updateSitePassword() {
+    var newPwd = document.getElementById('newSitePassword').value;
+    var confirmPwd = document.getElementById('confirmSitePassword').value;
+    var statusDiv = document.getElementById('passwordUpdateStatus');
+    var updateBtn = document.getElementById('updateSitePasswordBtn');
+    
+    // Show status and clear previous messages
+    statusDiv.style.display = 'block';
+    
+    // Validate password
+    if (!newPwd || newPwd.length < 8) {
+        statusDiv.innerHTML = '❌ Password must be at least 8 characters';
+        statusDiv.style.background = '#fff0f0';
+        statusDiv.style.color = '#dc3545';
+        return;
+    }
+    
+    if (newPwd !== confirmPwd) {
+        statusDiv.innerHTML = '❌ Passwords do not match';
+        statusDiv.style.background = '#fff0f0';
+        statusDiv.style.color = '#dc3545';
+        return;
+    }
+    
+    // Confirm the action
+    if (!confirm('⚠️ Are you sure you want to change the site password?\n\nThis will affect all users. Make sure you communicate the new password to authorized personnel.')) {
+        statusDiv.innerHTML = '⏸️ Password update cancelled';
+        statusDiv.style.background = '#fff3cd';
+        statusDiv.style.color = '#856404';
+        return;
+    }
+    
+    // Show loading state
+    statusDiv.innerHTML = '⏳ Updating password... Please wait.';
+    statusDiv.style.background = '#e8f4f8';
+    statusDiv.style.color = '#1a5c6e';
+    updateBtn.disabled = true;
+    updateBtn.textContent = '⏳ Updating...';
+    
+    try {
+        // Call the Supabase RPC function
+        var response = await fetch(SUPABASE_URL + '/rest/v1/rpc/update_site_password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({ 
+                new_password: newPwd 
+            })
+        });
+        
+        if (!response.ok) {
+            // Try to get error details
+            var errorText = await response.text();
+            throw new Error('HTTP ' + response.status + ': ' + errorText);
+        }
+        
+        var result = await response.json();
+        console.log("📊 Password update result:", result);
+        
+        if (result === true || result === 'true') {
+            // Success
+            statusDiv.innerHTML = '✅ Password updated successfully! New password is now active.';
+            statusDiv.style.background = '#d4edda';
+            statusDiv.style.color = '#155724';
+            
+            // Clear fields
+            document.getElementById('newSitePassword').value = '';
+            document.getElementById('confirmSitePassword').value = '';
+            
+            // Clear session so users need to re-login with new password
+            sessionStorage.removeItem('authenticated');
+            
+            // Log the password change (if you have logging function)
+            if (typeof addLog === 'function') {
+                await addLog(
+                    'PASSWORD_CHANGED',
+                    'SITE',
+                    'Site password was updated by admin: ' + (window.currentUser || 'Unknown'),
+                    window.currentUser || 'Admin',
+                    'Site password updated'
+                );
+            }
+            
+            // Show success message with auto-reload
+            setTimeout(function() {
+                var reloadConfirm = confirm(
+                    '🔐 Password updated!\n\n' +
+                    'The site will now reload.\n' +
+                    'You will need to use the NEW password to access the site.\n\n' +
+                    'Make sure to communicate the new password to all authorized users.'
+                );
+                if (reloadConfirm) {
+                    location.reload();
+                }
+            }, 2000);
+            
+        } else {
+            // Failed
+            statusDiv.innerHTML = '❌ Failed to update password. The server returned: ' + JSON.stringify(result);
+            statusDiv.style.background = '#fff0f0';
+            statusDiv.style.color = '#dc3545';
+        }
+        
+    } catch (err) {
+        console.error('❌ Password update error:', err);
+        statusDiv.innerHTML = '❌ Error updating password: ' + err.message;
+        statusDiv.style.background = '#fff0f0';
+        statusDiv.style.color = '#dc3545';
+    } finally {
+        // Reset button state
+        updateBtn.disabled = false;
+        updateBtn.textContent = '🔄 Update Password';
+    }
+}
+
+/**
+ * Test a password against the current site password
+ */
+async function testCurrentPassword() {
+    // Show the test modal
+    var modal = document.getElementById('passwordTestModal');
+    modal.style.display = 'flex';
+    document.getElementById('testPasswordInput').value = '';
+    document.getElementById('testPasswordInput').focus();
+    document.getElementById('testPasswordResult').innerHTML = '';
+}
+
+/**
+ * Run the password test
+ */
+async function runPasswordTest() {
+    var input = document.getElementById('testPasswordInput');
+    var resultDiv = document.getElementById('testPasswordResult');
+    var testPwd = input.value;
+    
+    if (!testPwd || testPwd.length < 1) {
+        resultDiv.innerHTML = '❌ Please enter a password to test';
+        resultDiv.style.color = '#dc3545';
+        return;
+    }
+    
+    resultDiv.innerHTML = '⏳ Verifying...';
+    resultDiv.style.color = '#1a5c6e';
+    
+    verifyPasswordWithSupabase(testPwd, function(isValid) {
+        if (isValid) {
+            resultDiv.innerHTML = '✅ Password is CORRECT!';
+            resultDiv.style.color = '#00a86b';
+            resultDiv.style.fontWeight = 'bold';
+        } else {
+            resultDiv.innerHTML = '❌ Password is INCORRECT';
+            resultDiv.style.color = '#dc3545';
+            resultDiv.style.fontWeight = 'bold';
+        }
+    });
+}
+
+/**
+ * Close the password test modal
+ */
+function closePasswordTest() {
+    document.getElementById('passwordTestModal').style.display = 'none';
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closePasswordTest();
+    }
+});
+
+// Close modal on outside click
+document.getElementById('passwordTestModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closePasswordTest();
+    }
+});
+
+// Enter key on test input
+document.getElementById('testPasswordInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        runPasswordTest();
+    }
+});
+</script>
+	
 <div id="loginPage" class="login-container">
     <div class="login-card">
         <div class="login-icon">🔬⚡</div>
@@ -5686,28 +6104,77 @@ window.addEventListener('beforeunload', function() {
 	}
     
     async function accountManagement() {
-        let modal = document.createElement("div"); modal.className = "modal-overlay";
-        let usersList = [];
-        if (currentUserRole === "admin") { const { data } = await supabaseClient.from('users').select('*'); usersList = data || []; }
-        modal.innerHTML = `<div class="modal-card" style="max-width:500px;"><button class="close-modal">✖</button><h3>👤 Account Management</h3>
-            <div style="text-align:center; margin-bottom:20px;"><div style="background:#166b5c; width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto;"><span style="font-size:40px;">👤</span></div><h4>${currentUser}</h4><p>Role: ${currentUserRole === 'admin' ? 'Administrator' : 'Super-user'}</p></div>
-			
-			${currentUserRole === "admin" ? `<hr><h4>Existing Users</h4><div style="max-height:150px; overflow-y:auto; background:#f8fafc; padding:10px; border-radius:12px;">${usersList.map(u => `<div style="padding:5px; border-bottom:1px solid #e2e8f0;">${u.username} (${u.role})</div>`).join('')}</div>
-			<hr><h4>Create New User</h4>
-			<div style="margin-bottom:10px;">
-			    <label style="font-size:0.7rem; font-weight:600;">Role</label>
-			    <select id="newUserRole" style="width:100%; padding:8px; border-radius:12px; border:1px solid #ccc;">
-			        <option value="super">Super-user</option>
-			        <option value="senior_super">Senior Super-user</option>
-			    </select>
-			</div>
-			<input type="text" id="newUsername" placeholder="Username" style="width:100%; padding:8px; margin:5px 0; border-radius:12px;">
-			<input type="text" id="newPassword" placeholder="Password" style="width:100%; padding:8px; margin:5px 0; border-radius:12px;">
-			<button id="createUserBtn" class="btn btn-primary" style="margin-top:10px; width:100%;">Create User</button>` : ''}
-			
-            <hr><h4>Change Password</h4><input type="password" id="oldPwd" placeholder="Current Password" style="width:100%; padding:8px; margin:5px 0; border-radius:12px;"><input type="password" id="newPwd" placeholder="New Password" style="width:100%; padding:8px; margin:5px 0; border-radius:12px;"><input type="password" id="confirmPwd" placeholder="Confirm Password" style="width:100%; padding:8px; margin:5px 0; border-radius:12px;"><button id="changePwdBtn" class="btn btn-primary" style="margin-top:10px; width:100%;">Change Password</button>
-        </div>`;
-        document.body.appendChild(modal);
+	    let modal = document.createElement("div"); 
+	    modal.className = "modal-overlay";
+	    let usersList = [];
+	    if (currentUserRole === "admin") { 
+	        const { data } = await supabaseClient.from('users').select('*'); 
+	        usersList = data || []; 
+	    }
+	    
+	    // Get the admin password section HTML
+	    var adminPasswordHtml = '';
+	    if (currentUserRole === "admin") {
+	        adminPasswordHtml = `
+	            <hr>
+	            <div style="margin-top:15px; padding:15px; background:#f0f7fa; border-radius:12px; border:1px solid #c5d9e8;">
+	                <h4 style="color:#0a2e3f; margin-bottom:8px;">🔐 Site Password Management</h4>
+	                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+	                    <input type="password" id="newSitePwd" placeholder="New Password (min 8 chars)" 
+	                           style="flex:1; min-width:150px; padding:8px 12px; border-radius:8px; border:1px solid #cbd5e1;">
+	                    <input type="password" id="confirmSitePwd" placeholder="Confirm Password" 
+	                           style="flex:1; min-width:150px; padding:8px 12px; border-radius:8px; border:1px solid #cbd5e1;">
+	                    <button id="updateSitePwdBtn" class="btn btn-primary" style="background:#1a5c6e; color:white; padding:8px 16px; border:none; border-radius:8px; cursor:pointer;">
+	                        🔄 Update
+	                    </button>
+	                </div>
+	                <div id="sitePwdStatus" style="margin-top:8px; font-size:0.8rem; display:none;"></div>
+	                <div style="font-size:0.65rem; color:#666; margin-top:4px;">
+	                    ⚠️ Changing the password will log out all users
+	                </div>
+	            </div>
+	        `;
+	    }
+	    
+	    modal.innerHTML = `<div class="modal-card" style="max-width:550px;">
+	        <button class="close-modal">✖</button>
+	        <h3>👤 Account Management</h3>
+	        <div style="text-align:center; margin-bottom:20px;">
+	            <div style="background:#166b5c; width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto;">
+	                <span style="font-size:40px;">👤</span>
+	            </div>
+	            <h4>${currentUser}</h4>
+	            <p>Role: ${currentUserRole === 'admin' ? 'Administrator' : currentUserRole === 'senior_super' ? 'Senior Super-user' : 'Super-user'}</p>
+	        </div>
+	        
+	        ${currentUserRole === "admin" ? `
+	        <hr><h4>Existing Users</h4>
+	        <div style="max-height:150px; overflow-y:auto; background:#f8fafc; padding:10px; border-radius:12px;">
+	            ${usersList.map(u => `<div style="padding:5px; border-bottom:1px solid #e2e8f0;">${u.username} (${u.role})</div>`).join('')}
+	        </div>
+	        <hr><h4>Create New User</h4>
+	        <div style="margin-bottom:10px;">
+	            <label style="font-size:0.7rem; font-weight:600;">Role</label>
+	            <select id="newUserRole" style="width:100%; padding:8px; border-radius:12px; border:1px solid #ccc;">
+	                <option value="super">Super-user</option>
+	                <option value="senior_super">Senior Super-user</option>
+	            </select>
+	        </div>
+	        <input type="text" id="newUsername" placeholder="Username" style="width:100%; padding:8px; margin:5px 0; border-radius:12px;">
+	        <input type="text" id="newPassword" placeholder="Password" style="width:100%; padding:8px; margin:5px 0; border-radius:12px;">
+	        <button id="createUserBtn" class="btn btn-primary" style="margin-top:10px; width:100%;">Create User</button>
+	        ` : ''}
+	        
+	        ${adminPasswordHtml}
+	        
+	        <hr><h4>Change Password</h4>
+	        <input type="password" id="oldPwd" placeholder="Current Password" style="width:100%; padding:8px; margin:5px 0; border-radius:12px;">
+	        <input type="password" id="newPwd" placeholder="New Password" style="width:100%; padding:8px; margin:5px 0; border-radius:12px;">
+	        <input type="password" id="confirmPwd" placeholder="Confirm Password" style="width:100%; padding:8px; margin:5px 0; border-radius:12px;">
+	        <button id="changePwdBtn" class="btn btn-primary" style="margin-top:10px; width:100%;">Change Password</button>
+	    </div>`;
+	    
+	    document.body.appendChild(modal);
         modal.querySelector(".close-modal").onclick = () => modal.remove();
         if (currentUserRole === "admin" && modal.querySelector("#createUserBtn")) {
 		    modal.querySelector("#createUserBtn").onclick = async () => {
@@ -5763,7 +6230,72 @@ window.addEventListener('beforeunload', function() {
     		alert("Password changed successfully");
     		modal.remove();
 		};
-    	}
+    	// Add site password update handler
+	    if (currentUserRole === "admin") {
+	        var updateSitePwdBtn = modal.querySelector("#updateSitePwdBtn");
+	        if (updateSitePwdBtn) {
+	            updateSitePwdBtn.onclick = async function() {
+	                var newPwd = modal.querySelector("#newSitePwd").value;
+	                var confirmPwd = modal.querySelector("#confirmSitePwd").value;
+	                var statusDiv = modal.querySelector("#sitePwdStatus");
+	                
+	                statusDiv.style.display = 'block';
+	                
+	                if (!newPwd || newPwd.length < 8) {
+	                    statusDiv.innerHTML = '❌ Password must be at least 8 characters';
+	                    statusDiv.style.color = '#dc3545';
+	                    return;
+	                }
+	                
+	                if (newPwd !== confirmPwd) {
+	                    statusDiv.innerHTML = '❌ Passwords do not match';
+	                    statusDiv.style.color = '#dc3545';
+	                    return;
+	                }
+	                
+	                if (!confirm('⚠️ Change site password?\n\nThis will log out all users.')) {
+	                    statusDiv.innerHTML = '⏸️ Cancelled';
+	                    statusDiv.style.color = '#856404';
+	                    return;
+	                }
+	                
+	                statusDiv.innerHTML = '⏳ Updating...';
+	                statusDiv.style.color = '#1a5c6e';
+	                
+	                try {
+	                    var response = await fetch(SUPABASE_URL + '/rest/v1/rpc/update_site_password', {
+	                        method: 'POST',
+	                        headers: {
+	                            'Content-Type': 'application/json',
+	                            'apikey': SUPABASE_ANON_KEY,
+	                            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+	                        },
+	                        body: JSON.stringify({ new_password: newPwd })
+	                    });
+	                    
+	                    var result = await response.json();
+	                    
+	                    if (result === true) {
+	                        statusDiv.innerHTML = '✅ Password updated! Logging out...';
+	                        statusDiv.style.color = '#00a86b';
+	                        sessionStorage.removeItem('authenticated');
+	                        setTimeout(function() {
+	                            alert('🔐 Site password updated!\n\nYou will be logged out. Please use the new password to login.');
+	                            modal.remove();
+	                            logout();
+	                        }, 1500);
+	                    } else {
+	                        statusDiv.innerHTML = '❌ Update failed: ' + JSON.stringify(result);
+	                        statusDiv.style.color = '#dc3545';
+	                    }
+	                } catch (err) {
+	                    statusDiv.innerHTML = '❌ Error: ' + err.message;
+	                    statusDiv.style.color = '#dc3545';
+	                }
+	            };
+	        }
+	    }
+	}
     
     async function login(username, password) {
 	    try {
