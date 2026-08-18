@@ -1,5 +1,5 @@
 // ============================================================
-// PRODUCTION CONFIG - Manual Creation
+// PRODUCTION CONFIG - Manual creation for testing
 // ============================================================
 
 const CONFIG = {
@@ -11,8 +11,14 @@ const CONFIG = {
     ENABLE_DEBUG: false
 };
 
+// Make it available globally
 if (typeof window !== 'undefined') {
     window.__CONFIG__ = CONFIG;
+}
+
+// Export for Node.js
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CONFIG;
 }
 
 console.log('✅ Production config loaded successfully');
