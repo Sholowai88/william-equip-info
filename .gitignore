@@ -1,0 +1,46 @@
+# ============================================================
+# SECURITY - NEVER COMMIT THESE FILES!
+# ============================================================
+
+# Config files with secrets
+config/config.js
+config/config.prod.js
+config.js
+*.env
+.env.local
+.env.*.local
+
+# ============================================================
+# DEVELOPMENT FILES
+# ============================================================
+
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# BACKUP FILES
+# ============================================================
+
+*.backup
+*.tmp
+*.temp
