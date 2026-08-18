@@ -1,28 +1,34 @@
-# .github/workflows/deploy.yml
 name: Deploy with Secure Config
 
 on:
-  # Trigger on push to main branch
   push:
     branches:
       - main
-  # Allow manual trigger
   workflow_dispatch:
+
+# Add permissions at the top level
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     
+    # Add permissions for this job
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
     steps:
-      # Step 1: Checkout your code
       - name: Checkout code
         uses: actions/checkout@v3
       
-      # Step 2: Create config directory
       - name: Create config directory
         run: mkdir -p config
       
-      # Step 3: Generate config file from secrets
       - name: Generate production config
         run: |
           echo "// ============================================================" > config/config.prod.js
@@ -38,23 +44,10 @@ jobs:
           echo "    ENABLE_DEBUG: false" >> config/config.prod.js
           echo "};" >> config/config.prod.js
           echo "" >> config/config.prod.js
-          echo "// Make it available globally" >> config/config.prod.js
           echo "if (typeof window !== 'undefined') {" >> config/config.prod.js
           echo "    window.__CONFIG__ = CONFIG;" >> config/config.prod.js
           echo "}" >> config/config.prod.js
-          echo "" >> config/config.prod.js
-          echo "// Export for Node.js" >> config/config.prod.js
-          echo "if (typeof module !== 'undefined' && module.exports) {" >> config/config.prod.js
-          echo "    module.exports = CONFIG;" >> config/config.prod.js
-          echo "}" >> config/config.prod.js
       
-      # Step 4: Verify config was created
-      - name: Verify config file
-        run: |
-          echo "📄 Config file created:"
-          head -20 config/config.prod.js
-      
-      # Step 5: Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
@@ -62,13 +55,7 @@ jobs:
           publish_dir: ./
           publish_branch: gh-pages
           keep_files: false
-          user_name: 'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
+          user_name: 'Sholowai88'
+          user_email: 'ntwc.william@gmail.com'  # ← CHANGE THIS to your email
           commit_message: 'Deploy with secure configuration'
-      
-      # Step 6: Show deployment URL
-      - name: Show deployment URL
-        run: |
-          echo "✅ Deployment complete!"
-          echo "🌐 Your site will be available at:"
-          echo "   https://${{ github.repository_owner }}.github.io/william-equip-info/"
+          force_orphan: true
