@@ -1418,30 +1418,6 @@ window.addEventListener('beforeunload', function() {
     // Make supabaseClient globally available
     window.supabaseClient = supabaseClient;
     
-    // ============================================================
-    // ALL YOUR EXISTING JAVASCRIPT CODE GOES HERE
-    // ============================================================
-    // COPY EVERYTHING FROM YOUR ORIGINAL SCRIPT SECTION
-    // FROM THE LINE: let currentUser = null, currentUserRole = null;
-    // TO THE END OF THE FILE
-    
-    // ============================================================
-    // THE ONLY CHANGE IS: REMOVE the hardcoded supabaseUrl and 
-    // supabaseAnonKey declarations, and use CONFIG instead.
-    // ============================================================
-    
-    // Instead of:
-    // const supabaseUrl = 'https://qhuqlhzvpmhykkmmqtth.supabase.co';
-    // const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
-    
-    // You now use:
-    // const supabaseUrl = CONFIG.SUPABASE_URL;
-    // const supabaseAnonKey = CONFIG.SUPABASE_ANON_KEY;
-    
-    // All other code remains exactly the same
-    
-    // ... YOUR ENTIRE EXISTING JAVASCRIPT CODE HERE ...
-    
     let currentUser = null, currentUserRole = null;
     let equipmentData = [], equipStatus = {}, historyRecords = [], dbLogs = [];
     let selectedAssetsSet = new Set();
