@@ -1,9 +1,8 @@
-// config/config.template.js
 // ============================================================
 // CONFIGURATION TEMPLATE - NO REAL CREDENTIALS HERE!
 // ============================================================
 // IMPORTANT: 
-// 1. Copy this file to config.js locally
+// 1. Copy this file to config.js
 // 2. Add your real Supabase credentials
 // 3. config.js is gitignored - it will NOT be uploaded to GitHub
 // ============================================================
