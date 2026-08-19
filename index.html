@@ -24,6 +24,8 @@
 	    
 	    // Flag to track if config is loaded
 	    let configLoaded = false;
+	    let configLoadAttempts = 0;
+	    const maxConfigAttempts = 3;
 	    
 	    // Function to show config error
 	    function showConfigError() {
@@ -54,6 +56,8 @@
 	            if (window.__CONFIG__) {
 	                console.log('✅ Config loaded successfully');
 	                configLoaded = true;
+	                // Store config in session for main app
+	                sessionStorage.setItem('app_config', JSON.stringify(window.__CONFIG__));
 	                initializePasswordProtection();
 	            } else {
 	                console.error('❌ __CONFIG__ not set after loading');
@@ -189,10 +193,8 @@
 	                    }
 	                }
 	                
-	                // Method 3: Emergency fallback - This should NEVER be used in production
-	                // Only for emergency recovery if everything else fails
-	                console.log("⚠️ All methods failed, trying emergency fallback...");
-	                // The system administrator should contact support
+	                // All methods failed
+	                console.error("❌ All verification methods failed");
 	                callback(false);
 	                
 	            } catch (err) {
@@ -1404,33 +1406,56 @@ window.addEventListener('beforeunload', function() {
     // GET CONFIGURATION FROM WINDOW OBJECT
     // ============================================================
     
-    // Get config from window object (set by config loader)
-    let CONFIG = window.__CONFIG__ || {};
-    
-    // Validate config
-    if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
-        console.error('❌ Configuration not available for main app');
-        // Show error and retry button
-        document.body.innerHTML = `
-            <div style="text-align:center; padding:50px; color:red; font-family:sans-serif;">
-                <h1>⚠️ Configuration Error</h1>
-                <p>Unable to load configuration. Please contact the administrator.</p>
-                <p style="font-size:12px; color:#666; margin-top:10px;">
-                    The site is not properly configured. Please check back later.
-                </p>
-                <button onclick="location.reload()" style="margin-top:20px; padding:10px 30px; background:#166b5c; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px;">
-                    🔄 Retry
-                </button>
-            </div>
-        `;
-        return;
+    // Wait for config to be available
+    function waitForConfig(callback, attempts) {
+        attempts = attempts || 0;
+        if (window.__CONFIG__ && window.__CONFIG__.SUPABASE_URL) {
+            console.log('✅ Config available for main app');
+            callback(window.__CONFIG__);
+            return;
+        }
+        
+        // Check if config was stored in session
+        var storedConfig = sessionStorage.getItem('app_config');
+        if (storedConfig) {
+            try {
+                var config = JSON.parse(storedConfig);
+                if (config && config.SUPABASE_URL) {
+                    console.log('✅ Config loaded from session storage');
+                    window.__CONFIG__ = config;
+                    callback(config);
+                    return;
+                }
+            } catch(e) {}
+        }
+        
+        attempts++;
+        if (attempts > 20) {
+            console.error('❌ Config not available after 20 attempts');
+            document.body.innerHTML = `
+                <div style="text-align:center; padding:50px; color:red; font-family:sans-serif;">
+                    <h1>⚠️ Configuration Error</h1>
+                    <p>Unable to load configuration. Please refresh the page.</p>
+                    <button onclick="location.reload()" style="margin-top:20px; padding:10px 30px; background:#166b5c; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px;">
+                        🔄 Refresh
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
+        setTimeout(function() {
+            waitForConfig(callback, attempts);
+        }, 200);
     }
     
-    // Initialize the app with the config
-    initializeAppWithConfig(CONFIG);
+    // Start the main app when config is ready
+    waitForConfig(function(CONFIG) {
+        initializeAppWithConfig(CONFIG);
+    });
     
     function initializeAppWithConfig(CONFIG) {
-        console.log('✅ Main app using configuration:', {
+        console.log('🚀 Main app starting with configuration:', {
             url: CONFIG.SUPABASE_URL ? '✓ Set' : '✗ Missing',
             env: CONFIG.APP_ENV || 'unknown',
             debug: CONFIG.ENABLE_DEBUG || false
@@ -1461,13 +1486,6 @@ window.addEventListener('beforeunload', function() {
         
         // Make supabaseClient globally available
         window.supabaseClient = supabaseClient;
-        
-        // ============================================================
-        // ALL YOUR EXISTING JAVASCRIPT CODE GOES HERE
-        // ============================================================
-        // COPY EVERYTHING FROM YOUR ORIGINAL SCRIPT SECTION
-        // FROM THE LINE: let currentUser = null, currentUserRole = null;
-        // TO THE END OF THE FILE
     
     let currentUser = null, currentUserRole = null;
     let equipmentData = [], equipStatus = {}, historyRecords = [], dbLogs = [];
