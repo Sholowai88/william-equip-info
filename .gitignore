@@ -2,10 +2,11 @@
 # SECURITY - NEVER COMMIT THESE FILES!
 # ============================================================
 
-# Config files with secrets
+# Config files with secrets (DO NOT COMMIT!)
 config/config.js
 config.js
-config.prod.js
+
+# Environment files
 *.env
 .env.local
 .env.*.local
@@ -38,3 +39,9 @@ desktop.ini
 *.backup
 *.tmp
 *.temp
+
+# ============================================================
+# IMPORTANT: config.prod.js is NOT ignored!
+# We want it in the gh-pages branch, but NOT in main.
+# ============================================================
+# config.prod.js  <-- DO NOT ADD THIS LINE!
