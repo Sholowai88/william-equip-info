@@ -505,14 +505,14 @@
 	            overlay.innerHTML = `
 	                <div class="auth-card">
 	                    <span class="auth-icon">🔬⚡</span>
-	                    <h2 class="auth-title">Equipment Database</h2>
+	                    <h2 class="auth-title">Equipment Management System</h2>
 	                    <p class="auth-subtitle">This page is password protected.<br>Please enter the password to continue.</p>
 	                    <input type="password" class="auth-input" id="authPassword" placeholder="Enter password..." autocomplete="off" autofocus>
 	                    <button class="auth-btn" onclick="window.checkAuthPassword()">🔓 Unlock</button>
 	                    <div class="auth-error" id="authError">❌ Incorrect password. Please try again.</div>
-	                    <div class="auth-security">🔐 Password stored securely (SHA-256)</div>
+	                    <div class="auth-security">🔐 Authorized personnel only</div>
 	                    <div class="auth-hint">🔒 Session expires when you close the browser</div>
-	                    <div class="auth-footer">Protected with Supabase Security</div>
+	                    <div class="auth-footer">Protected with Authentication Security</div>
 	                </div>
 	            `;
 	            document.body.appendChild(overlay);
