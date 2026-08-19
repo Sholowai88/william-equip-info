@@ -14,10 +14,9 @@
 	    
 	    // Determine environment
 	    const isProduction = window.location.hostname !== 'localhost' && 
-	                        window.location.hostname !== '127.0.0.1' &&
-	                        !window.location.hostname.includes('github.io');
+	                        window.location.hostname !== '127.0.0.1';
 	    
-	    // Load the appropriate config file
+	    // For GitHub Pages, always use config.prod.js
 	    const configFile = isProduction ? 'config.prod.js' : 'config/config.js';
 	    
 	    console.log('🔧 Loading config from:', configFile);
@@ -25,60 +24,15 @@
 	    
 	    // Flag to track if config is loaded
 	    let configLoaded = false;
-	    let configLoadAttempts = 0;
-	    const maxConfigAttempts = 3;
-	    
-	    // Function to initialize app after config is loaded
-	    function initializeAppWithConfig() {
-	        const CONFIG = window.__CONFIG__;
-	        
-	        if (CONFIG && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-	            console.log('✅ Config loaded successfully');
-	            configLoaded = true;
-	            // Proceed with password protection
-	            initializePasswordProtection();
-	        } else {
-	            console.error('❌ Invalid config - missing Supabase credentials');
-	            // Try fallback
-	            tryFallbackConfig();
-	        }
-	    }
-	    
-	    // Function to try fallback config
-	    function tryFallbackConfig() {
-	        configLoadAttempts++;
-	        console.warn(`⚠️ Attempt ${configLoadAttempts} to load fallback config...`);
-	        
-	        if (configLoadAttempts > maxConfigAttempts) {
-	            console.error('❌ Max config load attempts reached');
-	            showConfigError();
-	            return;
-	        }
-	        
-	        // Create emergency fallback config
-	        const fallbackConfig = {
-	            SUPABASE_URL: 'https://qhuqlhzvpmhykkmmqtth.supabase.co',
-	            SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFodXFsaHp2cG1oeWtrbW1xdHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMTM0OTQsImV4cCI6MjA5Njc4OTQ5NH0.pTTY4irj4vx-us8W1DyYaEB6ug_wEjuwNdy0lJjh_-8',
-	            APP_NAME: 'NTWC_MPU_DRWS',
-	            APP_VERSION: '2.0',
-	            APP_ENV: isProduction ? 'production' : 'development',
-	            ENABLE_DEBUG: !isProduction
-	        };
-	        
-	        window.__CONFIG__ = fallbackConfig;
-	        console.log('✅ Fallback config created');
-	        configLoaded = true;
-	        initializePasswordProtection();
-	    }
 	    
 	    // Function to show config error
 	    function showConfigError() {
 	        document.body.innerHTML = `
 	            <div style="text-align:center; padding:50px; color:red; font-family:sans-serif;">
 	                <h1>⚠️ Configuration Error</h1>
-	                <p>Unable to load configuration. Please check your setup.</p>
+	                <p>Unable to load configuration. Please contact the administrator.</p>
 	                <p style="font-size:12px; color:#666; margin-top:10px;">
-	                    Missing: ${configFile}
+	                    The site is not properly configured. Please check back later.
 	                </p>
 	                <button onclick="location.reload()" style="margin-top:20px; padding:10px 30px; background:#166b5c; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px;">
 	                    🔄 Retry
@@ -92,28 +46,28 @@
 	    configScript.src = configFile;
 	    configScript.onerror = function() {
 	        console.error('❌ Failed to load config file:', configFile);
-	        // Try fallback immediately
-	        tryFallbackConfig();
+	        showConfigError();
 	    };
 	    configScript.onload = function() {
 	        console.log('✅ Config script loaded');
-	        // Wait a moment for the script to set window.__CONFIG__
 	        setTimeout(function() {
 	            if (window.__CONFIG__) {
-	                initializeAppWithConfig();
+	                console.log('✅ Config loaded successfully');
+	                configLoaded = true;
+	                initializePasswordProtection();
 	            } else {
-	                console.warn('⚠️ Script loaded but __CONFIG__ not set, trying fallback');
-	                tryFallbackConfig();
+	                console.error('❌ __CONFIG__ not set after loading');
+	                showConfigError();
 	            }
 	        }, 100);
 	    };
 	    document.head.appendChild(configScript);
 	    
-	    // Timeout: If config doesn't load within 5 seconds, use fallback
+	    // Timeout: If config doesn't load within 5 seconds, show error
 	    setTimeout(function() {
 	        if (!configLoaded) {
-	            console.warn('⏰ Config load timeout, using fallback');
-	            tryFallbackConfig();
+	            console.error('⏰ Config load timeout');
+	            showConfigError();
 	        }
 	    }, 5000);
 	    
@@ -155,7 +109,6 @@
 	        // Check if already authenticated in this session
 	        if (sessionStorage.getItem('authenticated') === 'true') {
 	            console.log("✅ Already authenticated");
-	            // Make sure config is available for main app
 	            return;
 	        }
 	        
@@ -170,16 +123,13 @@
 	                    sessionStorage.setItem('authenticated', 'true');
 	                    window.history.replaceState({}, document.title, window.location.pathname);
 	                    console.log("✅ Password correct, authenticated");
-	                    // Reload to show content
 	                    location.reload();
 	                } else {
-	                    // Password required - show overlay
 	                    console.log("🔒 Password verification failed - showing overlay");
 	                    showPasswordOverlay();
 	                }
 	            });
 	        } else {
-	            // Password required - show overlay
 	            console.log("🔒 Password required - showing overlay");
 	            showPasswordOverlay();
 	        }
@@ -190,14 +140,12 @@
 	        
 	        /**
 	         * Verify password with Supabase using RPC call
-	         * @param {string} inputPassword - The password to verify
-	         * @param {function} callback - Callback function with boolean result
 	         */
 	        async function verifyPasswordWithSupabase(inputPassword, callback) {
 	            try {
 	                console.log("🔐 Verifying password with Supabase...");
 	                
-	                // Method 1: Call the stored procedure (recommended)
+	                // Method 1: Call the stored procedure
 	                var response = await fetch(SUPABASE_URL + '/rest/v1/rpc/verify_site_password', {
 	                    method: 'POST',
 	                    headers: {
@@ -217,7 +165,7 @@
 	                    return;
 	                }
 	                
-	                // Method 2: Fallback - Direct table query with client-side hashing
+	                // Method 2: Fallback - Direct table query
 	                console.log("🔄 RPC failed, trying fallback method...");
 	                var fallbackResponse = await fetch(SUPABASE_URL + '/rest/v1/site_passwords?id=eq.0&select=password_hash', {
 	                    method: 'GET',
@@ -233,7 +181,6 @@
 	                    console.log("📊 Fallback data received:", data);
 	                    
 	                    if (data && data.length > 0 && data[0].password_hash) {
-	                        // Hash the input password and compare
 	                        var hashedInput = await hashPasswordSHA256(inputPassword);
 	                        var isValid = hashedInput === data[0].password_hash;
 	                        console.log("🔐 Fallback verification result:", isValid);
@@ -242,12 +189,11 @@
 	                    }
 	                }
 	                
-	                // Method 3: Emergency fallback - check against a known hash
+	                // Method 3: Emergency fallback - This should NEVER be used in production
+	                // Only for emergency recovery if everything else fails
 	                console.log("⚠️ All methods failed, trying emergency fallback...");
-	                // This is a SHA-256 hash of "DRws24685868#"
-	                var emergencyHash = '6a5c1b5f6e8c9a7b3d4e2f1a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c';
-	                var hashedInput = await hashPasswordSHA256(inputPassword);
-	                callback(hashedInput === emergencyHash);
+	                // The system administrator should contact support
+	                callback(false);
 	                
 	            } catch (err) {
 	                console.error("❌ Password verification error:", err);
@@ -257,8 +203,6 @@
 	        
 	        /**
 	         * SHA-256 hash function using Web Crypto API
-	         * @param {string} password - The password to hash
-	         * @returns {string} - Hex string of the hash
 	         */
 	        async function hashPasswordSHA256(password) {
 	            try {
@@ -269,7 +213,6 @@
 	                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 	            } catch (err) {
 	                console.error("❌ Hash error:", err);
-	                // Simple fallback hash
 	                return password.split('').reduce(function(a, b) {
 	                    a = ((a << 5) - a) + b.charCodeAt(0);
 	                    return a & a;
@@ -302,7 +245,6 @@
 	                return;
 	            }
 	            
-	            // Show loading state
 	            var btn = document.querySelector('.auth-btn');
 	            if (btn) {
 	                btn.textContent = '⏳ Verifying...';
@@ -310,14 +252,12 @@
 	            }
 	            
 	            verifyPasswordWithSupabase(password, function(isValid) {
-	                // Reset button state
 	                if (btn) {
 	                    btn.textContent = '🔓 Unlock';
 	                    btn.disabled = false;
 	                }
 	                
 	                if (isValid) {
-	                    // Password correct - authenticate
 	                    sessionStorage.setItem('authenticated', 'true');
 	                    var overlayEl = document.getElementById('passwordOverlay');
 	                    if (overlayEl) {
@@ -330,12 +270,10 @@
 	                            blurredElements.forEach(function(el) {
 	                                el.classList.remove('page-blur');
 	                            });
-	                            // Reload to show full content
 	                            location.reload();
 	                        }, 500);
 	                    }
 	                } else {
-	                    // Password incorrect
 	                    error.classList.add('show');
 	                    error.textContent = '❌ Incorrect password. Please try again.';
 	                    input.value = '';
@@ -359,11 +297,10 @@
 	        });
 	        
 	        // ============================================================
-	        // PASSWORD OVERLAY - SHOW ON UNAUTHENTICATED ACCESS
+	        // PASSWORD OVERLAY
 	        // ============================================================
 	        
 	        function showPasswordOverlay() {
-	            // Wait for DOM to be ready
 	            if (document.readyState === 'loading') {
 	                document.addEventListener('DOMContentLoaded', function() {
 	                    createPasswordOverlay();
@@ -374,15 +311,12 @@
 	        }
 	        
 	        function createPasswordOverlay() {
-	            // Check if overlay already exists
 	            if (document.getElementById('passwordOverlay')) {
 	                return;
 	            }
 	            
-	            // Add overlay styles
 	            var overlayStyles = document.createElement('style');
 	            overlayStyles.textContent = `
-	                /* Password Overlay - Full screen with blur effect */
 	                #passwordOverlay {
 	                    position: fixed;
 	                    top: 0;
@@ -528,11 +462,9 @@
 	                    border-radius: 20px;
 	                    display: inline-block;
 	                }
-	                /* Prevent scrolling while overlay is active */
 	                body.no-scroll {
 	                    overflow: hidden !important;
 	                }
-	                /* Blur the background content */
 	                .page-blur {
 	                    filter: blur(8px) !important;
 	                    -webkit-filter: blur(8px) !important;
@@ -542,10 +474,8 @@
 	            `;
 	            document.head.appendChild(overlayStyles);
 	            
-	            // Add no-scroll class to body
 	            document.body.classList.add('no-scroll');
 	            
-	            // Blur all main content elements
 	            var elementsToBlur = [
 	                document.getElementById('appContainer'),
 	                document.getElementById('loginPage'),
@@ -561,7 +491,6 @@
 	                }
 	            });
 	            
-	            // Also blur any visible content
 	            var allContent = document.querySelectorAll('.app-container, .login-container, .ai-assistant, .ai-chat-window, .header, .tabs, .page, .filter-bar, .digital-clock');
 	            allContent.forEach(function(el) {
 	                if (el) {
@@ -569,7 +498,6 @@
 	                }
 	            });
 	            
-	            // Create the overlay
 	            var overlay = document.createElement('div');
 	            overlay.id = 'passwordOverlay';
 	            overlay.innerHTML = `
@@ -587,7 +515,6 @@
 	            `;
 	            document.body.appendChild(overlay);
 	            
-	            // Focus on input after a delay
 	            setTimeout(function() {
 	                var input = document.getElementById('authPassword');
 	                if (input) {
@@ -1477,57 +1404,25 @@ window.addEventListener('beforeunload', function() {
     // GET CONFIGURATION FROM WINDOW OBJECT
     // ============================================================
     
-    // Try to get config from multiple sources
+    // Get config from window object (set by config loader)
     let CONFIG = window.__CONFIG__ || {};
-    
-    // If config is not available, try to get from global variables
-    if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
-        console.warn('⚠️ Configuration not available from __CONFIG__, trying global variables...');
-        
-        // Check if password protection script set global variables
-        if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
-            CONFIG = {
-                SUPABASE_URL: window.SUPABASE_URL,
-                SUPABASE_ANON_KEY: window.SUPABASE_ANON_KEY,
-                APP_NAME: 'NTWC_MPU_DRWS',
-                APP_ENV: 'production',
-                ENABLE_DEBUG: false
-            };
-            console.log('✅ Using config from global variables');
-        } else {
-            // Final fallback - try to load config directly
-            console.warn('⚠️ No config found, attempting direct fetch...');
-            fetch('config.prod.js')
-                .then(response => response.text())
-                .then(text => {
-                    // Extract the config from the JS file
-                    try {
-                        // This is a hack - we're evaluating the config
-                        // In production, you should use a proper config loading mechanism
-                        eval(text);
-                        if (window.__CONFIG__) {
-                            CONFIG = window.__CONFIG__;
-                            console.log('✅ Config loaded via direct fetch');
-                            // Re-initialize with the loaded config
-                            initializeAppWithConfig(CONFIG);
-                        }
-                    } catch(e) {
-                        console.error('❌ Failed to eval config:', e);
-                        showConfigErrorAndRetry();
-                    }
-                })
-                .catch(err => {
-                    console.error('❌ Failed to fetch config:', err);
-                    showConfigErrorAndRetry();
-                });
-            return;
-        }
-    }
     
     // Validate config
     if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
         console.error('❌ Configuration not available for main app');
-        showConfigErrorAndRetry();
+        // Show error and retry button
+        document.body.innerHTML = `
+            <div style="text-align:center; padding:50px; color:red; font-family:sans-serif;">
+                <h1>⚠️ Configuration Error</h1>
+                <p>Unable to load configuration. Please contact the administrator.</p>
+                <p style="font-size:12px; color:#666; margin-top:10px;">
+                    The site is not properly configured. Please check back later.
+                </p>
+                <button onclick="location.reload()" style="margin-top:20px; padding:10px 30px; background:#166b5c; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px;">
+                    🔄 Retry
+                </button>
+            </div>
+        `;
         return;
     }
     
@@ -1565,7 +1460,14 @@ window.addEventListener('beforeunload', function() {
         const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
         
         // Make supabaseClient globally available
-        window.supabaseClient = supabaseClient;  
+        window.supabaseClient = supabaseClient;
+        
+        // ============================================================
+        // ALL YOUR EXISTING JAVASCRIPT CODE GOES HERE
+        // ============================================================
+        // COPY EVERYTHING FROM YOUR ORIGINAL SCRIPT SECTION
+        // FROM THE LINE: let currentUser = null, currentUserRole = null;
+        // TO THE END OF THE FILE
     
     let currentUser = null, currentUserRole = null;
     let equipmentData = [], equipStatus = {}, historyRecords = [], dbLogs = [];
@@ -6532,12 +6434,12 @@ window.addEventListener('beforeunload', function() {
 	                statusDiv.style.color = '#1a5c6e';
 	                
 	                try {
-	                    var response = await fetch(SUPABASE_URL + '/rest/v1/rpc/update_site_password', {
+	                    var response = await fetch(CONFIG.SUPABASE_URL + '/rest/v1/rpc/update_site_password', {
 	                        method: 'POST',
 	                        headers: {
 	                            'Content-Type': 'application/json',
-	                            'apikey': SUPABASE_ANON_KEY,
-	                            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+	                            'apikey': CONFIG.SUPABASE_ANON_KEY,
+								'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY
 	                        },
 	                        body: JSON.stringify({ new_password: newPwd })
 	                    });
