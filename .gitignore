@@ -1,0 +1,47 @@
+# ============================================================
+# SECURITY - NEVER COMMIT THESE FILES!
+# ============================================================
+
+# Config files with secrets (DO NOT COMMIT!)
+config/config.js
+config.js
+
+# Environment files
+*.env
+.env.local
+.env.*.local
+*.env
+
+# ============================================================
+# BUILD OUTPUTS
+# ============================================================
+
+node_modules/
+dist/
+build/
+*.log
+
+# ============================================================
+# SYSTEM FILES
+# ============================================================
+
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+desktop.ini
+
+# ============================================================
+# BACKUP FILES
+# ============================================================
+
+*.backup
+*.tmp
+*.temp
+
+# ============================================================
+# IMPORTANT: config.prod.js is NOT ignored!
+# We want it in the gh-pages branch, but NOT in main.
+# ============================================================
+# config.prod.js  <-- DO NOT ADD THIS LINE!
