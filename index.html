@@ -4,622 +4,478 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
     
-    <!-- ============================================================ -->
-	<!-- 🔐 START: SECURE CONFIGURATION LOADER                        -->
-	<!-- ============================================================ -->
-	<script>
-	    // ============================================================
-	    // CONFIGURATION LOADER - Loads config from external file
-	    // ============================================================
-	    
-	    // Determine environment
-	    const isProduction = window.location.hostname !== 'localhost' && 
-	                        window.location.hostname !== '127.0.0.1' &&
-	                        !window.location.hostname.includes('github.io');
-	    
-	    // Load the appropriate config file
-	    const configFile = isProduction ? 'config.prod.js' : 'config/config.js';
-	    
-	    console.log('🔧 Loading config from:', configFile);
-	    console.log('🌐 Environment:', isProduction ? 'production' : 'development');
-	    
-	    // Flag to track if config is loaded
-	    let configLoaded = false;
-	    let configLoadAttempts = 0;
-	    const maxConfigAttempts = 3;
-	    
-	    // Function to initialize app after config is loaded
-	    function initializeAppWithConfig() {
-	        const CONFIG = window.__CONFIG__;
-	        
-	        if (CONFIG && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-	            console.log('✅ Config loaded successfully');
-	            configLoaded = true;
-	            // Proceed with password protection
-	            initializePasswordProtection();
-	        } else {
-	            console.error('❌ Invalid config - missing Supabase credentials');
-	            // Try fallback
-	            tryFallbackConfig();
-	        }
-	    }
-	    
-	    // Function to try fallback config
-	    function tryFallbackConfig() {
-	        configLoadAttempts++;
-	        console.warn(`⚠️ Attempt ${configLoadAttempts} to load fallback config...`);
-	        
-	        if (configLoadAttempts > maxConfigAttempts) {
-	            console.error('❌ Max config load attempts reached');
-	            showConfigError();
-	            return;
-	        }
-	        
-	        // Create emergency fallback config
-	        const fallbackConfig = {
-	            SUPABASE_URL: 'https://qhuqlhzvpmhykkmmqtth.supabase.co',
-	            SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFodXFsaHp2cG1oeWtrbW1xdHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMTM0OTQsImV4cCI6MjA5Njc4OTQ5NH0.pTTY4irj4vx-us8W1DyYaEB6ug_wEjuwNdy0lJjh_-8',
-	            APP_NAME: 'NTWC_MPU_DRWS',
-	            APP_VERSION: '2.0',
-	            APP_ENV: isProduction ? 'production' : 'development',
-	            ENABLE_DEBUG: !isProduction
-	        };
-	        
-	        window.__CONFIG__ = fallbackConfig;
-	        console.log('✅ Fallback config created');
-	        configLoaded = true;
-	        initializePasswordProtection();
-	    }
-	    
-	    // Function to show config error
-	    function showConfigError() {
-	        document.body.innerHTML = `
-	            <div style="text-align:center; padding:50px; color:red; font-family:sans-serif;">
-	                <h1>⚠️ Configuration Error</h1>
-	                <p>Unable to load configuration. Please check your setup.</p>
-	                <p style="font-size:12px; color:#666; margin-top:10px;">
-	                    Missing: ${configFile}
-	                </p>
-	                <button onclick="location.reload()" style="margin-top:20px; padding:10px 30px; background:#166b5c; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px;">
-	                    🔄 Retry
-	                </button>
-	            </div>
-	        `;
-	    }
-	    
-	    // Create script element to load config
-	    const configScript = document.createElement('script');
-	    configScript.src = configFile;
-	    configScript.onerror = function() {
-	        console.error('❌ Failed to load config file:', configFile);
-	        // Try fallback immediately
-	        tryFallbackConfig();
-	    };
-	    configScript.onload = function() {
-	        console.log('✅ Config script loaded');
-	        // Wait a moment for the script to set window.__CONFIG__
-	        setTimeout(function() {
-	            if (window.__CONFIG__) {
-	                initializeAppWithConfig();
-	            } else {
-	                console.warn('⚠️ Script loaded but __CONFIG__ not set, trying fallback');
-	                tryFallbackConfig();
-	            }
-	        }, 100);
-	    };
-	    document.head.appendChild(configScript);
-	    
-	    // Timeout: If config doesn't load within 5 seconds, use fallback
-	    setTimeout(function() {
-	        if (!configLoaded) {
-	            console.warn('⏰ Config load timeout, using fallback');
-	            tryFallbackConfig();
-	        }
-	    }, 5000);
-	    
-	    // ============================================================
-	    // PASSWORD PROTECTION - Uses config for Supabase credentials
-	    // ============================================================
-	    
-	    // Flag to prevent multiple initializations
-	    let isInitialized = false;
-	    
-	    function initializePasswordProtection() {
-	        // Prevent multiple initializations
-	        if (isInitialized) {
-	            console.log('⚠️ Password protection already initialized');
-	            return;
-	        }
-	        isInitialized = true;
-	        
-	        const CONFIG = window.__CONFIG__;
-	        
-	        if (!CONFIG || !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
-	            console.error('❌ Configuration not available - cannot initialize password protection');
-	            showConfigError();
-	            return;
-	        }
-	        
-	        console.log('🔐 Initializing password protection with Supabase...');
-	        
-	        // ============================================================
-	        // SUPABASE CONFIGURATION - FROM SECURE CONFIG
-	        // ============================================================
-	        const SUPABASE_URL = CONFIG.SUPABASE_URL;
-	        const SUPABASE_ANON_KEY = CONFIG.SUPABASE_ANON_KEY;
-	        
-	        // ============================================================
-	        // AUTHENTICATION CHECK
-	        // ============================================================
-	        
-	        // Check if already authenticated in this session
-	        if (sessionStorage.getItem('authenticated') === 'true') {
-	            console.log("✅ Already authenticated");
-	            // Make sure config is available for main app
-	            return;
-	        }
-	        
-	        // Check URL for password parameter (for bookmark with password)
-	        var urlParams = new URLSearchParams(window.location.search);
-	        var enteredPassword = urlParams.get('password');
-	        
-	        if (enteredPassword) {
-	            // Verify password with Supabase
-	            verifyPasswordWithSupabase(enteredPassword, function(isValid) {
-	                if (isValid) {
-	                    sessionStorage.setItem('authenticated', 'true');
-	                    window.history.replaceState({}, document.title, window.location.pathname);
-	                    console.log("✅ Password correct, authenticated");
-	                    // Reload to show content
-	                    location.reload();
-	                } else {
-	                    // Password required - show overlay
-	                    console.log("🔒 Password verification failed - showing overlay");
-	                    showPasswordOverlay();
-	                }
-	            });
-	        } else {
-	            // Password required - show overlay
-	            console.log("🔒 Password required - showing overlay");
-	            showPasswordOverlay();
-	        }
-	        
-	        // ============================================================
-	        // PASSWORD VERIFICATION FUNCTIONS
-	        // ============================================================
-	        
-	        /**
-	         * Verify password with Supabase using RPC call
-	         * @param {string} inputPassword - The password to verify
-	         * @param {function} callback - Callback function with boolean result
-	         */
-	        async function verifyPasswordWithSupabase(inputPassword, callback) {
-	            try {
-	                console.log("🔐 Verifying password with Supabase...");
-	                
-	                // Method 1: Call the stored procedure (recommended)
-	                var response = await fetch(SUPABASE_URL + '/rest/v1/rpc/verify_site_password', {
-	                    method: 'POST',
-	                    headers: {
-	                        'Content-Type': 'application/json',
-	                        'apikey': SUPABASE_ANON_KEY,
-	                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
-	                    },
-	                    body: JSON.stringify({ 
-	                        input_password: inputPassword 
-	                    })
-	                });
-	                
-	                if (response.ok) {
-	                    var result = await response.json();
-	                    console.log("🔐 Verification result (RPC):", result);
-	                    callback(result === true || result === 'true');
-	                    return;
-	                }
-	                
-	                // Method 2: Fallback - Direct table query with client-side hashing
-	                console.log("🔄 RPC failed, trying fallback method...");
-	                var fallbackResponse = await fetch(SUPABASE_URL + '/rest/v1/site_passwords?id=eq.0&select=password_hash', {
-	                    method: 'GET',
-	                    headers: {
-	                        'Content-Type': 'application/json',
-	                        'apikey': SUPABASE_ANON_KEY,
-	                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
-	                    }
-	                });
-	                
-	                if (fallbackResponse.ok) {
-	                    var data = await fallbackResponse.json();
-	                    console.log("📊 Fallback data received:", data);
-	                    
-	                    if (data && data.length > 0 && data[0].password_hash) {
-	                        // Hash the input password and compare
-	                        var hashedInput = await hashPasswordSHA256(inputPassword);
-	                        var isValid = hashedInput === data[0].password_hash;
-	                        console.log("🔐 Fallback verification result:", isValid);
-	                        callback(isValid);
-	                        return;
-	                    }
-	                }
-	                
-	                // Method 3: Emergency fallback - check against a known hash
-	                console.log("⚠️ All methods failed, trying emergency fallback...");
-	                // This is a SHA-256 hash of "DRws24685868#"
-	                var emergencyHash = '6a5c1b5f6e8c9a7b3d4e2f1a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c';
-	                var hashedInput = await hashPasswordSHA256(inputPassword);
-	                callback(hashedInput === emergencyHash);
-	                
-	            } catch (err) {
-	                console.error("❌ Password verification error:", err);
-	                callback(false);
-	            }
-	        }
-	        
-	        /**
-	         * SHA-256 hash function using Web Crypto API
-	         * @param {string} password - The password to hash
-	         * @returns {string} - Hex string of the hash
-	         */
-	        async function hashPasswordSHA256(password) {
-	            try {
-	                var encoder = new TextEncoder();
-	                var data = encoder.encode(password);
-	                var hashBuffer = await crypto.subtle.digest('SHA-256', data);
-	                var hashArray = Array.from(new Uint8Array(hashBuffer));
-	                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-	            } catch (err) {
-	                console.error("❌ Hash error:", err);
-	                // Simple fallback hash
-	                return password.split('').reduce(function(a, b) {
-	                    a = ((a << 5) - a) + b.charCodeAt(0);
-	                    return a & a;
-	                }, 0).toString(16);
-	            }
-	        }
-	        
-	        // ============================================================
-	        // PASSWORD CHECK FUNCTION - Called from UI
-	        // ============================================================
-	        
-	        window.checkAuthPassword = function() {
-	            var input = document.getElementById('authPassword');
-	            var error = document.getElementById('authError');
-	            
-	            if (!input || !error) {
-	                console.error("❌ Password input or error element not found");
-	                return;
-	            }
-	            
-	            var password = input.value;
-	            
-	            if (!password || password.length < 1) {
-	                error.classList.add('show');
-	                error.textContent = '❌ Please enter a password';
-	                input.focus();
-	                setTimeout(function() {
-	                    error.classList.remove('show');
-	                }, 3000);
-	                return;
-	            }
-	            
-	            // Show loading state
-	            var btn = document.querySelector('.auth-btn');
-	            if (btn) {
-	                btn.textContent = '⏳ Verifying...';
-	                btn.disabled = true;
-	            }
-	            
-	            verifyPasswordWithSupabase(password, function(isValid) {
-	                // Reset button state
-	                if (btn) {
-	                    btn.textContent = '🔓 Unlock';
-	                    btn.disabled = false;
-	                }
-	                
-	                if (isValid) {
-	                    // Password correct - authenticate
-	                    sessionStorage.setItem('authenticated', 'true');
-	                    var overlayEl = document.getElementById('passwordOverlay');
-	                    if (overlayEl) {
-	                        overlayEl.style.transition = 'opacity 0.5s ease';
-	                        overlayEl.style.opacity = '0';
-	                        setTimeout(function() {
-	                            overlayEl.remove();
-	                            document.body.classList.remove('no-scroll');
-	                            var blurredElements = document.querySelectorAll('.page-blur');
-	                            blurredElements.forEach(function(el) {
-	                                el.classList.remove('page-blur');
-	                            });
-	                            // Reload to show full content
-	                            location.reload();
-	                        }, 500);
-	                    }
-	                } else {
-	                    // Password incorrect
-	                    error.classList.add('show');
-	                    error.textContent = '❌ Incorrect password. Please try again.';
-	                    input.value = '';
-	                    input.focus();
-	                    setTimeout(function() {
-	                        error.classList.remove('show');
-	                    }, 3000);
-	                }
-	            });
-	        };
-	        
-	        // ============================================================
-	        // ENTER KEY SUPPORT
-	        // ============================================================
-	        
-	        document.addEventListener('keypress', function(e) {
-	            if (e.target && e.target.id === 'authPassword' && e.key === 'Enter') {
-	                e.preventDefault();
-	                window.checkAuthPassword();
-	            }
-	        });
-	        
-	        // ============================================================
-	        // PASSWORD OVERLAY - SHOW ON UNAUTHENTICATED ACCESS
-	        // ============================================================
-	        
-	        function showPasswordOverlay() {
-	            // Wait for DOM to be ready
-	            if (document.readyState === 'loading') {
-	                document.addEventListener('DOMContentLoaded', function() {
-	                    createPasswordOverlay();
-	                });
-	            } else {
-	                createPasswordOverlay();
-	            }
-	        }
-	        
-	        function createPasswordOverlay() {
-	            // Check if overlay already exists
-	            if (document.getElementById('passwordOverlay')) {
-	                return;
-	            }
-	            
-	            // Add overlay styles
-	            var overlayStyles = document.createElement('style');
-	            overlayStyles.textContent = `
-	                /* Password Overlay - Full screen with blur effect */
-	                #passwordOverlay {
-	                    position: fixed;
-	                    top: 0;
-	                    left: 0;
-	                    width: 100%;
-	                    height: 100%;
-	                    background: rgba(0, 0, 0, 0.75);
-	                    backdrop-filter: blur(15px);
-	                    -webkit-backdrop-filter: blur(15px);
-	                    display: flex;
-	                    align-items: center;
-	                    justify-content: center;
-	                    z-index: 999999;
-	                    font-family: 'Segoe UI', sans-serif;
-	                    animation: fadeInOverlay 0.5s ease;
-	                }
-	                @keyframes fadeInOverlay {
-	                    from { opacity: 0; }
-	                    to { opacity: 1; }
-	                }
-	                #passwordOverlay .auth-card {
-	                    background: white;
-	                    padding: 45px 40px 40px 40px;
-	                    border-radius: 28px;
-	                    max-width: 420px;
-	                    width: 90%;
-	                    text-align: center;
-	                    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
-	                    animation: slideUp 0.5s ease;
-	                    position: relative;
-	                    overflow: hidden;
-	                }
-	                #passwordOverlay .auth-card::before {
-	                    content: '';
-	                    position: absolute;
-	                    top: 0;
-	                    left: 0;
-	                    right: 0;
-	                    height: 4px;
-	                    background: linear-gradient(90deg, #0a2e3f, #1a5c6e, #0a2e3f);
-	                }
-	                @keyframes slideUp {
-	                    from { transform: translateY(30px); opacity: 0; }
-	                    to { transform: translateY(0); opacity: 1; }
-	                }
-	                #passwordOverlay .auth-icon {
-	                    font-size: 56px;
-	                    margin-bottom: 16px;
-	                    display: block;
-	                }
-	                #passwordOverlay .auth-title {
-	                    color: #0a2e3f;
-	                    font-size: 22px;
-	                    margin-bottom: 6px;
-	                    font-weight: 700;
-	                }
-	                #passwordOverlay .auth-subtitle {
-	                    color: #666;
-	                    font-size: 14px;
-	                    margin-bottom: 25px;
-	                    line-height: 1.5;
-	                }
-	                #passwordOverlay .auth-input {
-	                    width: 100%;
-	                    padding: 14px 18px;
-	                    border: 2px solid #e2e8f0;
-	                    border-radius: 14px;
-	                    font-size: 16px;
-	                    margin-bottom: 15px;
-	                    box-sizing: border-box;
-	                    transition: all 0.3s;
-	                    background: #f8fafc;
-	                }
-	                #passwordOverlay .auth-input:focus {
-	                    outline: none;
-	                    border-color: #1a5c6e;
-	                    box-shadow: 0 0 0 4px rgba(26,92,110,0.1);
-	                    background: white;
-	                }
-	                #passwordOverlay .auth-btn {
-	                    width: 100%;
-	                    padding: 14px;
-	                    background: linear-gradient(135deg, #0a2e3f, #1a5c6e);
-	                    color: white;
-	                    border: none;
-	                    border-radius: 14px;
-	                    font-size: 16px;
-	                    cursor: pointer;
-	                    font-weight: 600;
-	                    transition: all 0.3s;
-	                    letter-spacing: 0.5px;
-	                }
-	                #passwordOverlay .auth-btn:hover {
-	                    transform: translateY(-2px);
-	                    box-shadow: 0 8px 30px rgba(26,92,110,0.35);
-	                }
-	                #passwordOverlay .auth-btn:active {
-	                    transform: scale(0.97);
-	                }
-	                #passwordOverlay .auth-btn:disabled {
-	                    opacity: 0.7;
-	                    cursor: not-allowed;
-	                    transform: none;
-	                }
-	                #passwordOverlay .auth-error {
-	                    color: #dc3545;
-	                    font-size: 13px;
-	                    margin-top: 12px;
-	                    display: none;
-	                    padding: 8px 12px;
-	                    background: #ffe0db;
-	                    border-radius: 8px;
-	                }
-	                #passwordOverlay .auth-error.show {
-	                    display: block;
-	                    animation: shake 0.5s ease;
-	                }
-	                @keyframes shake {
-	                    0%, 100% { transform: translateX(0); }
-	                    20% { transform: translateX(-10px); }
-	                    40% { transform: translateX(10px); }
-	                    60% { transform: translateX(-6px); }
-	                    80% { transform: translateX(6px); }
-	                }
-	                #passwordOverlay .auth-hint {
-	                    font-size: 12px;
-	                    color: #999;
-	                    margin-top: 15px;
-	                }
-	                #passwordOverlay .auth-footer {
-	                    margin-top: 18px;
-	                    padding-top: 14px;
-	                    border-top: 1px solid #eee;
-	                    font-size: 11px;
-	                    color: #bbb;
-	                }
-	                #passwordOverlay .auth-security {
-	                    margin-top: 10px;
-	                    font-size: 11px;
-	                    color: #2ecc71;
-	                    background: #eafaf1;
-	                    padding: 4px 12px;
-	                    border-radius: 20px;
-	                    display: inline-block;
-	                }
-	                /* Prevent scrolling while overlay is active */
-	                body.no-scroll {
-	                    overflow: hidden !important;
-	                }
-	                /* Blur the background content */
-	                .page-blur {
-	                    filter: blur(8px) !important;
-	                    -webkit-filter: blur(8px) !important;
-	                    pointer-events: none !important;
-	                    user-select: none !important;
-	                }
-	            `;
-	            document.head.appendChild(overlayStyles);
-	            
-	            // Add no-scroll class to body
-	            document.body.classList.add('no-scroll');
-	            
-	            // Blur all main content elements
-	            var elementsToBlur = [
-	                document.getElementById('appContainer'),
-	                document.getElementById('loginPage'),
-	                document.getElementById('aiAssistant'),
-	                document.getElementById('aiChatWindow'),
-	                document.getElementById('liveTime'),
-	                document.getElementById('liveDate')
-	            ];
-	            
-	            elementsToBlur.forEach(function(el) {
-	                if (el) {
-	                    el.classList.add('page-blur');
-	                }
-	            });
-	            
-	            // Also blur any visible content
-	            var allContent = document.querySelectorAll('.app-container, .login-container, .ai-assistant, .ai-chat-window, .header, .tabs, .page, .filter-bar, .digital-clock');
-	            allContent.forEach(function(el) {
-	                if (el) {
-	                    el.classList.add('page-blur');
-	                }
-	            });
-	            
-	            // Create the overlay
-	            var overlay = document.createElement('div');
-	            overlay.id = 'passwordOverlay';
-	            overlay.innerHTML = `
-	                <div class="auth-card">
-	                    <span class="auth-icon">🔬⚡</span>
-	                    <h2 class="auth-title">Equipment Database</h2>
-	                    <p class="auth-subtitle">This page is password protected.<br>Please enter the password to continue.</p>
-	                    <input type="password" class="auth-input" id="authPassword" placeholder="Enter password..." autocomplete="off" autofocus>
-	                    <button class="auth-btn" onclick="window.checkAuthPassword()">🔓 Unlock</button>
-	                    <div class="auth-error" id="authError">❌ Incorrect password. Please try again.</div>
-	                    <div class="auth-security">🔐 Password stored securely (SHA-256)</div>
-	                    <div class="auth-hint">🔒 Session expires when you close the browser</div>
-	                    <div class="auth-footer">Protected with Supabase Security</div>
-	                </div>
-	            `;
-	            document.body.appendChild(overlay);
-	            
-	            // Focus on input after a delay
-	            setTimeout(function() {
-	                var input = document.getElementById('authPassword');
-	                if (input) {
-	                    input.focus();
-	                }
-	            }, 300);
-	        }
-	        
-	        // Make functions globally accessible
-	        window.verifyPasswordWithSupabase = verifyPasswordWithSupabase;
-	        window.hashPasswordSHA256 = hashPasswordSHA256;
-	        window.showPasswordOverlay = showPasswordOverlay;
-	        window.SUPABASE_URL = SUPABASE_URL;
-	        window.SUPABASE_ANON_KEY = SUPABASE_ANON_KEY;
-	    }
-	</script>
-	<!-- ============================================================ -->
-	<!-- 🔐 END: SECURE CONFIGURATION LOADER                          -->
-	<!-- ============================================================ -->
-    
     <title>NTWC MPU DR Workshop | Equipment Management System</title>
-    
-    <!-- ============================================================ -->
-    <!-- EXTERNAL LIBRARIES - UNCHANGED                               -->
-    <!-- ============================================================ -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <!-- ============================================================ -->
-    <!-- STYLES - COPY ALL YOUR EXISTING STYLES HERE                  -->
+    <!-- CONFIGURATION LOADER - Loads config from external file       -->
     <!-- ============================================================ -->
+    <script>
+        // ============================================================
+        // CONFIGURATION LOADER - Simplified for production
+        // ============================================================
+        
+        console.log('🔧 Loading config from: config.prod.js');
+        
+        // Create script element to load config
+        const configScript = document.createElement('script');
+        configScript.src = 'config.prod.js';
+        configScript.onload = function() {
+            console.log('✅ Config script loaded');
+            initializePasswordProtection();
+        };
+        configScript.onerror = function() {
+            console.error('❌ Failed to load config.prod.js');
+            // Try fallback - direct fetch
+            fetch('config.prod.js')
+                .then(response => response.text())
+                .then(text => {
+                    // Evaluate the config
+                    eval(text);
+                    if (typeof window.__CONFIG__ !== 'undefined') {
+                        console.log('✅ Config loaded via fallback');
+                        initializePasswordProtection();
+                    } else {
+                        showConfigError();
+                    }
+                })
+                .catch(function() {
+                    showConfigError();
+                });
+        };
+        document.head.appendChild(configScript);
+        
+        function showConfigError() {
+            document.body.innerHTML = `
+                <div style="text-align:center; padding:50px; color:red; font-family:sans-serif;">
+                    <h1>⚠️ Configuration Error</h1>
+                    <p>Unable to load configuration. Please contact administrator.</p>
+                    <p style="font-size:12px; color:#666;">config.prod.js not found</p>
+                </div>
+            `;
+        }
+        
+        function initializePasswordProtection() {
+            const CONFIG = window.__CONFIG__;
+            
+            if (!CONFIG || !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
+                console.error('❌ Configuration not available');
+                showConfigError();
+                return;
+            }
+            
+            console.log('🔐 Initializing password protection...');
+            
+            // ============================================================
+            // SUPABASE CONFIGURATION - FROM SECURE CONFIG
+            // ============================================================
+            const SUPABASE_URL = CONFIG.SUPABASE_URL;
+            const SUPABASE_ANON_KEY = CONFIG.SUPABASE_ANON_KEY;
+            
+            // ============================================================
+            // AUTHENTICATION CHECK
+            // ============================================================
+            
+            // Check if already authenticated
+            if (sessionStorage.getItem('authenticated') === 'true') {
+                console.log("✅ Already authenticated");
+                return;
+            }
+            
+            // Check URL for password parameter
+            var urlParams = new URLSearchParams(window.location.search);
+            var enteredPassword = urlParams.get('password');
+            
+            if (enteredPassword) {
+                verifyPasswordWithSupabase(enteredPassword, function(isValid) {
+                    if (isValid) {
+                        sessionStorage.setItem('authenticated', 'true');
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        console.log("✅ Password correct, authenticated");
+                        location.reload();
+                    } else {
+                        console.log("🔒 Password verification failed");
+                        showPasswordOverlay();
+                    }
+                });
+            } else {
+                console.log("🔒 Password required");
+                showPasswordOverlay();
+            }
+            
+            // ============================================================
+            // PASSWORD VERIFICATION
+            // ============================================================
+            
+            async function verifyPasswordWithSupabase(inputPassword, callback) {
+                try {
+                    console.log("🔐 Verifying password...");
+                    
+                    var response = await fetch(SUPABASE_URL + '/rest/v1/rpc/verify_site_password', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                        },
+                        body: JSON.stringify({ 
+                            input_password: inputPassword 
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        var result = await response.json();
+                        callback(result === true || result === 'true');
+                        return;
+                    }
+                    
+                    // Fallback - direct query
+                    var fallbackResponse = await fetch(SUPABASE_URL + '/rest/v1/site_passwords?id=eq.0&select=password_hash', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                        }
+                    });
+                    
+                    if (fallbackResponse.ok) {
+                        var data = await fallbackResponse.json();
+                        if (data && data.length > 0 && data[0].password_hash) {
+                            var hashedInput = await hashPasswordSHA256(inputPassword);
+                            callback(hashedInput === data[0].password_hash);
+                            return;
+                        }
+                    }
+                    
+                    callback(false);
+                    
+                } catch (err) {
+                    console.error("❌ Password verification error:", err);
+                    callback(false);
+                }
+            }
+            
+            async function hashPasswordSHA256(password) {
+                try {
+                    var encoder = new TextEncoder();
+                    var data = encoder.encode(password);
+                    var hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                    var hashArray = Array.from(new Uint8Array(hashBuffer));
+                    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                } catch (err) {
+                    console.error("❌ Hash error:", err);
+                    return password.split('').reduce(function(a, b) {
+                        a = ((a << 5) - a) + b.charCodeAt(0);
+                        return a & a;
+                    }, 0).toString(16);
+                }
+            }
+            
+            // ============================================================
+            // PASSWORD CHECK FUNCTION
+            // ============================================================
+            
+            window.checkAuthPassword = function() {
+                var input = document.getElementById('authPassword');
+                var error = document.getElementById('authError');
+                
+                if (!input || !error) {
+                    console.error("❌ Password input not found");
+                    return;
+                }
+                
+                var password = input.value;
+                
+                if (!password || password.length < 1) {
+                    error.classList.add('show');
+                    error.textContent = '❌ Please enter a password';
+                    input.focus();
+                    setTimeout(function() {
+                        error.classList.remove('show');
+                    }, 3000);
+                    return;
+                }
+                
+                var btn = document.querySelector('.auth-btn');
+                if (btn) {
+                    btn.textContent = '⏳ Verifying...';
+                    btn.disabled = true;
+                }
+                
+                verifyPasswordWithSupabase(password, function(isValid) {
+                    if (btn) {
+                        btn.textContent = '🔓 Unlock';
+                        btn.disabled = false;
+                    }
+                    
+                    if (isValid) {
+                        sessionStorage.setItem('authenticated', 'true');
+                        var overlayEl = document.getElementById('passwordOverlay');
+                        if (overlayEl) {
+                            overlayEl.style.transition = 'opacity 0.5s ease';
+                            overlayEl.style.opacity = '0';
+                            setTimeout(function() {
+                                overlayEl.remove();
+                                document.body.classList.remove('no-scroll');
+                                var blurredElements = document.querySelectorAll('.page-blur');
+                                blurredElements.forEach(function(el) {
+                                    el.classList.remove('page-blur');
+                                });
+                                location.reload();
+                            }, 500);
+                        }
+                    } else {
+                        error.classList.add('show');
+                        error.textContent = '❌ Incorrect password. Please try again.';
+                        input.value = '';
+                        input.focus();
+                        setTimeout(function() {
+                            error.classList.remove('show');
+                        }, 3000);
+                    }
+                });
+            };
+            
+            document.addEventListener('keypress', function(e) {
+                if (e.target && e.target.id === 'authPassword' && e.key === 'Enter') {
+                    e.preventDefault();
+                    window.checkAuthPassword();
+                }
+            });
+            
+            // ============================================================
+            // PASSWORD OVERLAY
+            // ============================================================
+            
+            function showPasswordOverlay() {
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', createPasswordOverlay);
+                } else {
+                    createPasswordOverlay();
+                }
+            }
+            
+            function createPasswordOverlay() {
+                var overlayStyles = document.createElement('style');
+                overlayStyles.textContent = `
+                    #passwordOverlay {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0, 0, 0, 0.75);
+                        backdrop-filter: blur(15px);
+                        -webkit-backdrop-filter: blur(15px);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 999999;
+                        font-family: 'Segoe UI', sans-serif;
+                        animation: fadeInOverlay 0.5s ease;
+                    }
+                    @keyframes fadeInOverlay {
+                        from { opacity: 0; }
+                        to { opacity: 1; }
+                    }
+                    #passwordOverlay .auth-card {
+                        background: white;
+                        padding: 45px 40px 40px 40px;
+                        border-radius: 28px;
+                        max-width: 420px;
+                        width: 90%;
+                        text-align: center;
+                        box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+                        animation: slideUp 0.5s ease;
+                        position: relative;
+                        overflow: hidden;
+                    }
+                    #passwordOverlay .auth-card::before {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        height: 4px;
+                        background: linear-gradient(90deg, #0a2e3f, #1a5c6e, #0a2e3f);
+                    }
+                    @keyframes slideUp {
+                        from { transform: translateY(30px); opacity: 0; }
+                        to { transform: translateY(0); opacity: 1; }
+                    }
+                    #passwordOverlay .auth-icon {
+                        font-size: 56px;
+                        margin-bottom: 16px;
+                        display: block;
+                    }
+                    #passwordOverlay .auth-title {
+                        color: #0a2e3f;
+                        font-size: 22px;
+                        margin-bottom: 6px;
+                        font-weight: 700;
+                    }
+                    #passwordOverlay .auth-subtitle {
+                        color: #666;
+                        font-size: 14px;
+                        margin-bottom: 25px;
+                        line-height: 1.5;
+                    }
+                    #passwordOverlay .auth-input {
+                        width: 100%;
+                        padding: 14px 18px;
+                        border: 2px solid #e2e8f0;
+                        border-radius: 14px;
+                        font-size: 16px;
+                        margin-bottom: 15px;
+                        box-sizing: border-box;
+                        transition: all 0.3s;
+                        background: #f8fafc;
+                    }
+                    #passwordOverlay .auth-input:focus {
+                        outline: none;
+                        border-color: #1a5c6e;
+                        box-shadow: 0 0 0 4px rgba(26,92,110,0.1);
+                        background: white;
+                    }
+                    #passwordOverlay .auth-btn {
+                        width: 100%;
+                        padding: 14px;
+                        background: linear-gradient(135deg, #0a2e3f, #1a5c6e);
+                        color: white;
+                        border: none;
+                        border-radius: 14px;
+                        font-size: 16px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        transition: all 0.3s;
+                        letter-spacing: 0.5px;
+                    }
+                    #passwordOverlay .auth-btn:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 8px 30px rgba(26,92,110,0.35);
+                    }
+                    #passwordOverlay .auth-btn:active {
+                        transform: scale(0.97);
+                    }
+                    #passwordOverlay .auth-btn:disabled {
+                        opacity: 0.7;
+                        cursor: not-allowed;
+                        transform: none;
+                    }
+                    #passwordOverlay .auth-error {
+                        color: #dc3545;
+                        font-size: 13px;
+                        margin-top: 12px;
+                        display: none;
+                        padding: 8px 12px;
+                        background: #ffe0db;
+                        border-radius: 8px;
+                    }
+                    #passwordOverlay .auth-error.show {
+                        display: block;
+                        animation: shake 0.5s ease;
+                    }
+                    @keyframes shake {
+                        0%, 100% { transform: translateX(0); }
+                        20% { transform: translateX(-10px); }
+                        40% { transform: translateX(10px); }
+                        60% { transform: translateX(-6px); }
+                        80% { transform: translateX(6px); }
+                    }
+                    #passwordOverlay .auth-hint {
+                        font-size: 12px;
+                        color: #999;
+                        margin-top: 15px;
+                    }
+                    #passwordOverlay .auth-footer {
+                        margin-top: 18px;
+                        padding-top: 14px;
+                        border-top: 1px solid #eee;
+                        font-size: 11px;
+                        color: #bbb;
+                    }
+                    #passwordOverlay .auth-security {
+                        margin-top: 10px;
+                        font-size: 11px;
+                        color: #2ecc71;
+                        background: #eafaf1;
+                        padding: 4px 12px;
+                        border-radius: 20px;
+                        display: inline-block;
+                    }
+                    body.no-scroll {
+                        overflow: hidden !important;
+                    }
+                    .page-blur {
+                        filter: blur(8px) !important;
+                        -webkit-filter: blur(8px) !important;
+                        pointer-events: none !important;
+                        user-select: none !important;
+                    }
+                `;
+                document.head.appendChild(overlayStyles);
+                
+                document.body.classList.add('no-scroll');
+                
+                var elementsToBlur = [
+                    document.getElementById('appContainer'),
+                    document.getElementById('loginPage'),
+                    document.getElementById('aiAssistant'),
+                    document.getElementById('aiChatWindow'),
+                    document.getElementById('liveTime'),
+                    document.getElementById('liveDate')
+                ];
+                
+                elementsToBlur.forEach(function(el) {
+                    if (el) {
+                        el.classList.add('page-blur');
+                    }
+                });
+                
+                var allContent = document.querySelectorAll('.app-container, .login-container, .ai-assistant, .ai-chat-window, .header, .tabs, .page, .filter-bar, .digital-clock');
+                allContent.forEach(function(el) {
+                    if (el) {
+                        el.classList.add('page-blur');
+                    }
+                });
+                
+                var overlay = document.createElement('div');
+                overlay.id = 'passwordOverlay';
+                overlay.innerHTML = `
+                    <div class="auth-card">
+                        <span class="auth-icon">🔬⚡</span>
+                        <h2 class="auth-title">Equipment Database</h2>
+                        <p class="auth-subtitle">This page is password protected.<br>Please enter the password to continue.</p>
+                        <input type="password" class="auth-input" id="authPassword" placeholder="Enter password..." autocomplete="off" autofocus>
+                        <button class="auth-btn" onclick="window.checkAuthPassword()">🔓 Unlock</button>
+                        <div class="auth-error" id="authError">❌ Incorrect password. Please try again.</div>
+                        <div class="auth-security">🔐 Password stored securely (SHA-256)</div>
+                        <div class="auth-hint">🔒 Session expires when you close the browser</div>
+                        <div class="auth-footer">Protected with Supabase Security</div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                
+                setTimeout(function() {
+                    var input = document.getElementById('authPassword');
+                    if (input) {
+                        input.focus();
+                    }
+                }, 300);
+            }
+            
+            window.verifyPasswordWithSupabase = verifyPasswordWithSupabase;
+            window.hashPasswordSHA256 = hashPasswordSHA256;
+        }
+    </script>
+    <!-- ============================================================ -->
+    <!-- END CONFIGURATION LOADER                                     -->
+    <!-- ============================================================ -->
+    
     <style>
+        /* ALL YOUR EXISTING STYLES GO HERE - Copy them from your original file */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, system-ui, sans-serif; }
         body { background: #eef2f9; padding: 16px; min-height: 100vh; }
         .app-container { max-width: 1600px; margin: 0 auto; background: white; border-radius: 28px; box-shadow: 0 12px 30px rgba(0,0,0,0.08); overflow: hidden; display: none; }
@@ -639,13 +495,9 @@
         .login-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); background: linear-gradient(135deg, #1a5c6e, #0a2e3f); }
         .error-msg { color: #dc3545; font-size: 0.85rem; margin-top: 15px; background: #ffe0db; padding: 10px; border-radius: 30px; }
 
-        /* Poke notification override - ensure it can be shown */
         #pokeNotification { display: none !important; }
         #pokeNotification.visible { display: inline-block !important; visibility: visible !important; opacity: 1 !important; }
         
-        /* ============================================================
-           AI ASSISTANT - PROFESSIONAL CHAT DESIGN
-           ============================================================ */
         .ai-assistant { 
             position: fixed; 
             bottom: 30px; 
@@ -918,7 +770,6 @@
             transform: scale(0.95);
         }
         
-        /* Mobile responsiveness */
         @media (max-width: 768px) {
             .ai-chat-window {
                 width: 92vw;
@@ -1024,429 +875,11 @@
 <body>
 
 <!-- ============================================================ -->
-<!-- ADMIN PASSWORD MANAGEMENT - Only visible to Admin users      -->
+<!-- YOUR EXISTING HTML CONTENT - COPY EVERYTHING BELOW           -->
 <!-- ============================================================ -->
-<div id="adminPasswordSection" style="display:none; margin-top:20px; padding:20px; background:#f8fafc; border-radius:16px; border:1px solid #e2e8f0;">
-    <h4 style="color:#0a2e3f; margin-bottom:12px;">🔐 Change Site Password</h4>
-    <p style="font-size:0.8rem; color:#666; margin-bottom:15px;">
-        Update the site access password. This will affect all users.
-        <br>⚠️ Make sure to communicate the new password to authorized users.
-    </p>
-    <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
-        <div style="flex:1; min-width:200px;">
-            <label style="font-size:0.7rem; font-weight:600; color:#0a2e3f; display:block; margin-bottom:4px;">New Password *</label>
-            <input type="password" id="newSitePassword" placeholder="Enter new password (min 8 chars)" 
-                   style="width:100%; padding:10px 14px; border-radius:12px; border:1px solid #cbd5e1; font-size:0.9rem; background:white;">
-        </div>
-        <div style="flex:1; min-width:200px;">
-            <label style="font-size:0.7rem; font-weight:600; color:#0a2e3f; display:block; margin-bottom:4px;">Confirm Password *</label>
-            <input type="password" id="confirmSitePassword" placeholder="Confirm new password" 
-                   style="width:100%; padding:10px 14px; border-radius:12px; border:1px solid #cbd5e1; font-size:0.9rem; background:white;">
-        </div>
-        <div style="display:flex; gap:8px; align-items:flex-end; margin-top:auto;">
-            <button id="updateSitePasswordBtn" class="btn btn-primary" style="padding:10px 24px; background:#1a5c6e; color:white; border:none; border-radius:12px; font-weight:600; cursor:pointer; transition:all 0.3s;" 
-                    onclick="updateSitePassword()">
-                🔄 Update Password
-            </button>
-            <button id="testSitePasswordBtn" class="btn" style="padding:10px 24px; background:#e67e22; color:white; border:none; border-radius:12px; font-weight:600; cursor:pointer; transition:all 0.3s;" 
-                    onclick="testCurrentPassword()">
-                🔍 Test Password
-            </button>
-        </div>
-    </div>
-    <div id="passwordUpdateStatus" style="margin-top:12px; font-size:0.85rem; padding:8px 12px; border-radius:8px; display:none;"></div>
-    <div style="margin-top:10px; font-size:0.75rem; color:#999; display:flex; gap:20px; flex-wrap:wrap;">
-        <span>📋 Password requirements: min 8 characters</span>
-        <span>🔒 Stored with SHA-256 encryption</span>
-        <span>📝 Changes logged in DB Logs</span>
-    </div>
-</div>
-
-<!-- Password Test Dialog -->
-<div id="passwordTestModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:99999; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-    <div style="background:white; padding:30px 35px; border-radius:20px; max-width:400px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-        <h3 style="color:#0a2e3f; margin-bottom:8px;">🔍 Test Password</h3>
-        <p style="color:#666; font-size:0.85rem; margin-bottom:15px;">Enter a password to check if it's valid</p>
-        <input type="password" id="testPasswordInput" placeholder="Enter password to test..." 
-               style="width:100%; padding:12px 16px; border-radius:12px; border:1px solid #cbd5e1; font-size:1rem; margin-bottom:12px;">
-        <div id="testPasswordResult" style="font-size:0.85rem; margin-bottom:12px; min-height:24px;"></div>
-        <div style="display:flex; gap:10px; justify-content:flex-end;">
-            <button onclick="closePasswordTest()" class="btn" style="padding:8px 20px; background:#e2e8f0; border:none; border-radius:8px; cursor:pointer;">Close</button>
-            <button onclick="runPasswordTest()" class="btn btn-primary" style="padding:8px 20px; background:#1a5c6e; color:white; border:none; border-radius:8px; cursor:pointer;">🔍 Test</button>
-        </div>
-    </div>
-</div>
-
-<script>
-// ============================================================
-// ADMIN PASSWORD MANAGEMENT FUNCTIONS
-// ============================================================
-
-/**
- * Update the site password in Supabase
- * This function is called from the admin UI
- */
-async function updateSitePassword() {
-    var newPwd = document.getElementById('newSitePassword').value;
-    var confirmPwd = document.getElementById('confirmSitePassword').value;
-    var statusDiv = document.getElementById('passwordUpdateStatus');
-    var updateBtn = document.getElementById('updateSitePasswordBtn');
-    
-    // Show status and clear previous messages
-    statusDiv.style.display = 'block';
-    
-    // Validate password
-    if (!newPwd || newPwd.length < 8) {
-        statusDiv.innerHTML = '❌ Password must be at least 8 characters';
-        statusDiv.style.background = '#fff0f0';
-        statusDiv.style.color = '#dc3545';
-        return;
-    }
-    
-    if (newPwd !== confirmPwd) {
-        statusDiv.innerHTML = '❌ Passwords do not match';
-        statusDiv.style.background = '#fff0f0';
-        statusDiv.style.color = '#dc3545';
-        return;
-    }
-    
-    // Confirm the action
-    if (!confirm('⚠️ Are you sure you want to change the site password?\n\nThis will affect all users. Make sure you communicate the new password to authorized personnel.')) {
-        statusDiv.innerHTML = '⏸️ Password update cancelled';
-        statusDiv.style.background = '#fff3cd';
-        statusDiv.style.color = '#856404';
-        return;
-    }
-    
-    // Show loading state
-    statusDiv.innerHTML = '⏳ Updating password... Please wait.';
-    statusDiv.style.background = '#e8f4f8';
-    statusDiv.style.color = '#1a5c6e';
-    updateBtn.disabled = true;
-    updateBtn.textContent = '⏳ Updating...';
-    
-    try {
-        // Call the Supabase RPC function using the config
-        const CONFIG = window.__CONFIG__ || {};
-        const response = await fetch(CONFIG.SUPABASE_URL + '/rest/v1/rpc/update_site_password', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': CONFIG.SUPABASE_ANON_KEY,
-                'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY
-            },
-            body: JSON.stringify({ 
-                new_password: newPwd 
-            })
-        });
-        
-        if (!response.ok) {
-            var errorText = await response.text();
-            throw new Error('HTTP ' + response.status + ': ' + errorText);
-        }
-        
-        var result = await response.json();
-        console.log("📊 Password update result:", result);
-        
-        if (result === true || result === 'true') {
-            // Success
-            statusDiv.innerHTML = '✅ Password updated successfully! New password is now active.';
-            statusDiv.style.background = '#d4edda';
-            statusDiv.style.color = '#155724';
-            
-            // Clear fields
-            document.getElementById('newSitePassword').value = '';
-            document.getElementById('confirmSitePassword').value = '';
-            
-            // Clear session so users need to re-login with new password
-            sessionStorage.removeItem('authenticated');
-            
-            // Log the password change (if you have logging function)
-            if (typeof addLog === 'function') {
-                await addLog(
-                    'PASSWORD_CHANGED',
-                    'SITE',
-                    'Site password was updated by admin: ' + (window.currentUser || 'Unknown'),
-                    window.currentUser || 'Admin',
-                    'Site password updated'
-                );
-            }
-            
-            // Show success message with auto-reload
-            setTimeout(function() {
-                var reloadConfirm = confirm(
-                    '🔐 Password updated!\n\n' +
-                    'The site will now reload.\n' +
-                    'You will need to use the NEW password to access the site.\n\n' +
-                    'Make sure to communicate the new password to all authorized users.'
-                );
-                if (reloadConfirm) {
-                    location.reload();
-                }
-            }, 2000);
-            
-        } else {
-            // Failed
-            statusDiv.innerHTML = '❌ Failed to update password. The server returned: ' + JSON.stringify(result);
-            statusDiv.style.background = '#fff0f0';
-            statusDiv.style.color = '#dc3545';
-        }
-        
-    } catch (err) {
-        console.error('❌ Password update error:', err);
-        statusDiv.innerHTML = '❌ Error updating password: ' + err.message;
-        statusDiv.style.background = '#fff0f0';
-        statusDiv.style.color = '#dc3545';
-    } finally {
-        // Reset button state
-        updateBtn.disabled = false;
-        updateBtn.textContent = '🔄 Update Password';
-    }
-}
-
-/**
- * Test a password against the current site password
- */
-async function testCurrentPassword() {
-    // Show the test modal
-    var modal = document.getElementById('passwordTestModal');
-    modal.style.display = 'flex';
-    document.getElementById('testPasswordInput').value = '';
-    document.getElementById('testPasswordInput').focus();
-    document.getElementById('testPasswordResult').innerHTML = '';
-}
-
-/**
- * Run the password test
- */
-async function runPasswordTest() {
-    var input = document.getElementById('testPasswordInput');
-    var resultDiv = document.getElementById('testPasswordResult');
-    var testPwd = input.value;
-    
-    if (!testPwd || testPwd.length < 1) {
-        resultDiv.innerHTML = '❌ Please enter a password to test';
-        resultDiv.style.color = '#dc3545';
-        return;
-    }
-    
-    resultDiv.innerHTML = '⏳ Verifying...';
-    resultDiv.style.color = '#1a5c6e';
-    
-    // Use the global verifyPasswordWithSupabase function from the config loader
-    if (typeof window.verifyPasswordWithSupabase === 'function') {
-        window.verifyPasswordWithSupabase(testPwd, function(isValid) {
-            if (isValid) {
-                resultDiv.innerHTML = '✅ Password is CORRECT!';
-                resultDiv.style.color = '#00a86b';
-                resultDiv.style.fontWeight = 'bold';
-            } else {
-                resultDiv.innerHTML = '❌ Password is INCORRECT';
-                resultDiv.style.color = '#dc3545';
-                resultDiv.style.fontWeight = 'bold';
-            }
-        });
-    } else {
-        resultDiv.innerHTML = '❌ Verification function not available. Please refresh the page.';
-        resultDiv.style.color = '#dc3545';
-    }
-}
-
-/**
- * Close the password test modal
- */
-function closePasswordTest() {
-    document.getElementById('passwordTestModal').style.display = 'none';
-}
-
-// Close modal on Escape key
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        closePasswordTest();
-    }
-});
-
-// Close modal on outside click
-document.getElementById('passwordTestModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closePasswordTest();
-    }
-});
-
-// Enter key on test input
-document.getElementById('testPasswordInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        runPasswordTest();
-    }
-});
-</script>
-
+<!-- IMPORTANT: Copy ALL your HTML content (login page, AI assistant, app container, etc.) -->
+<!-- from your original file and paste it here.                    -->
 <!-- ============================================================ -->
-<!-- LOGIN PAGE - UNCHANGED                                        -->
-<!-- ============================================================ -->
-<div id="loginPage" class="login-container">
-    <div class="login-card">
-        <div class="login-icon">🔬⚡</div>
-        <h2>NTWC MPU DR Workshop</h2>
-        <h3>Equipment Management System</h3>
-        <input type="text" id="loginUsername" class="login-input" placeholder="Username" autocomplete="off">
-        <input type="password" id="loginPassword" class="login-input" placeholder="Password">
-        <button id="loginBtn" class="login-btn">🔓 Login to System</button>
-        <div id="loginError" class="error-msg"></div>
-    </div>
-</div>
-
-<!-- ============================================================ -->
-<!-- AI ASSISTANT - UNCHANGED                                     -->
-<!-- ============================================================ -->
-<div id="aiAssistant" class="ai-assistant"><div class="ai-avatar"><span>🤖👷</span></div></div>
-<div id="aiChatWindow" class="ai-chat-window">
-    <div class="ai-chat-header" id="aiChatHeader">
-        <div class="ai-chat-header-top">
-            <h4>
-                🤖 AI Engineering Assistant
-                <span>v2.0</span>
-            </h4>
-            <button id="closeAiChat" title="Close chat">✕</button>
-        </div>
-        <div class="ai-quick-actions">
-            <button onclick="document.getElementById('aiInput').value='help';sendAIMessage();">💡 Help</button>
-            <button onclick="document.getElementById('aiInput').value='how to in';sendAIMessage();">📥 IN</button>
-            <button onclick="document.getElementById('aiInput').value='how to out';sendAIMessage();">📤 OUT</button>
-            <button onclick="document.getElementById('aiInput').value='statistics';sendAIMessage();">📊 Stats</button>
-            <button onclick="document.getElementById('aiInput').value='photos';sendAIMessage();">📸 Photos</button>
-            <button onclick="document.getElementById('aiInput').value='poke';sendAIMessage();">🔔 Poke</button>
-            <button onclick="document.getElementById('aiInput').value='compare';sendAIMessage();">📊 Compare</button>
-            <button onclick="document.getElementById('aiInput').value='troubleshooting';sendAIMessage();">🔧 Fix</button>
-            <button onclick="document.getElementById('aiInput').value='introduction';sendAIMessage();">ℹ️ Intro</button>
-        </div>
-    </div>
-    <div class="ai-messages" id="aiMessages">
-        <div class="message bot">
-            <div class="message-bubble">
-                <strong>🤖 Hello! I'm your AI Engineering Assistant.</strong><br><br>
-                I can help you with:<br>
-                • Equipment management and IN/OUT procedures<br>
-                • Account management and user roles<br>
-                • Troubleshooting common issues<br>
-                • Database statistics and trends<br><br>
-                <strong>💡 Quick Tips:</strong><br>
-                • Click the buttons above for common topics<br>
-                • Type <strong>help</strong> to see all available topics<br>
-                • Ask me anything about the system!<br><br>
-                What would you like to know?
-            </div>
-        </div>
-    </div>
-    <div class="ai-input-area">
-        <input type="text" id="aiInput" placeholder="Ask me anything about the equipment database..." autocomplete="off">
-        <button id="aiSendBtn">Send</button>
-    </div>
-</div>
-
-<!-- ============================================================ -->
-<!-- APP CONTAINER - UNCHANGED                                    -->
-<!-- ============================================================ -->
-<div id="appContainer" class="app-container">
-    <div class="header">
-        <div class="title-section"><h1>🔧⚙️ NTWC MPU DR Workshop Equipment Database</h1><div class="subtitle">Equipment and Tools Management | QA/AT/Maintenance</div></div>
-        <div class="digital-clock">
-            <div class="time" id="liveTime">--:--:--</div>
-            <div class="date" id="liveDate">----/--/--</div>
-        </div>
-        <div id="pokeNotification" style="position:relative; cursor:pointer; background:rgba(255,255,255,0.15); padding:6px 14px; border-radius:50px;" onclick="window.showPokeDetails && window.showPokeDetails();">
-            <span>🔔</span>
-            <span id="pokeCount" style="font-weight:bold; color:#ff6b6b;">0</span>
-            <span style="font-size:0.7rem;">pokes</span>
-        </div>
-        <div class="action-group">
-            <button id="refreshBtn" class="refresh-btn">🔄 Refresh</button>
-            <button id="accountBtn">👤 Account</button>
-            <button id="backupBtn" class="admin-only" style="display:inline-block;">💾 Backup</button>
-            <button id="restoreBtn" class="admin-only" style="display:inline-block;">📂 Restore</button>
-            <button id="supabaseBackupBtn" class="admin-only" style="display:inline-block;">☁️ Supabase Backup</button>
-            <button id="logoutBtn">🚪 Logout</button>
-            <div class="sync-status"><span class="sync-dot"></span><span id="syncStatusText">Live Sync</span></div>
-            <div class="sync-status" style="position:relative; display:flex; align-items:center; gap:6px;">
-                <span class="sync-dot" style="background:#1a5c6e; box-shadow:0 0 5px #4169e1; animation: pulse-blue 2s infinite;"></span>
-                <span id="syncStatusText">Live Sync</span>
-                <span id="photoSyncStatus" style="font-size:0.6rem; margin-left:5px; color:#4169e1;">📸</span>
-            </div>
-        </div>
-    </div>
-    <div class="tabs"><button class="tab active" data-page="home">📋 Equipment DB</button><button class="tab" data-page="record">✍️ In/Out Record</button><button class="tab" data-page="history">📜 History Logs</button><button id="dblogsTab" class="tab" data-page="dblogs">📊 DB Logs</button></div>
-
-    <div id="homePage" class="page active">
-        <div class="filter-bar">
-            <input type="text" id="equipSearch" placeholder="🔍 Search">
-            <select id="filterLocation"></select>
-            <select id="filterParentAsset"></select>
-            <select id="filterStatus"><option value="">All Status</option><option value="IN">IN</option><option value="OUT">OUT</option></select>
-            <button id="clearSearchBtn" class="btn">Clear Filter</button>
-            <span id="selectedCountBadge" style="background:#e2e8f0; padding:4px 12px; border-radius:40px;">0 selected</span>
-            <button id="clearSelEquipBtn" class="btn btn-sm">Clear</button>
-            <button id="selectAllEquipBtn" class="btn btn-sm">Select All</button>
-            <button id="addNewEquipBtn" class="btn btn-primary btn-sm">➕ Add New</button>
-            <button id="compareBtn" class="btn btn-primary btn-sm" style="background:#e67e22;">📊 Compare</button>
-            <button id="compareStatBtn" class="btn btn-primary btn-sm admin-only" style="background:#8e44ad; display:none;">📈 Compare Stat</button>
-        </div>
-        <div class="table-wrapper"><table id="equipTable"><thead><tr><th style="width:30px">Select</th><th>Asset #</th><th>Description</th><th>Manufacturer</th><th>Serial #</th><th>Location</th><th>Parent</th><th>Status</th><th>Photo</th><th>Actions</th></tr></thead><tbody id="equipTableBody"></tbody></table></div>
-    </div>
-
-    <div id="recordPage" class="page">
-        <div class="panel-card" style="background:#f9fbfe; border-radius:20px; padding:20px; border:1px solid #e2edf2;"><h3>📋 Equipment In/Out Transaction</h3><div class="warning-box" id="statusWarning"></div>
-            <div class="flex-form"><div class="form-group"><label>📅 Date & Time (HK) *</label><input type="datetime-local" id="recordDatetime"><button id="todayBtn" class="btn btn-sm" style="margin-top:4px;">Today</button></div><div class="form-group"><label>Status *</label><select id="inOutStatus"><option value="IN">✅ IN (Return)</option><option value="OUT">🚪 OUT (Check-out)</option></select></div><div class="form-group"><label>Job Type *</label><select id="jobType"><option value="">--Select--</option><option value="PM">PM (Preventive Maintenance)</option><option value="CM">CM (Corrective Maintenance)</option><option value="QA">QA (Quality Assurance)</option><option value="AT">AT (Acceptance Test)</option><option value="OTH">OTH (Others)</option></select></div><div class="form-group"><label>Purpose *</label><input type="text" id="purposeInput" placeholder="Specific purpose of transaction"></div></div>
-            <div class="flex-form"><div class="form-group"><label>⚡ ET (Ctrl/Cmd+Click) *</label><select multiple id="etSelect" class="multi-select" size="3"></select></div>
-                <div class="form-group"><label>🔧 SET *</label><select id="setSelect"><option value="">--Select--</option><option value="Reeve">Reeve</option><option value="Kelvin">Kelvin</option><option value="Deputizing">Deputizing</option></select></div>
-                <div class="form-group"><label>🧪 Physicist *</label><select id="phySelect"><option value="">--Select--</option><option value="Xiao Li">Xiao Li</option><option value="Celina">Celina</option><option value="Keith">Keith</option><option value="Jacky">Jacky</option><option value="Martin">Martin</option><option value="RT Phy.">RT Phy.</option><option value="N/A">N/A</option></select></div>
-                <div class="form-group"><label>📝 Others</label><input type="text" id="othersNames" placeholder="Deputizing name etc."></div>
-                <div class="form-group"><label>💬 Remarks</label><input type="text" id="remarksField" placeholder="Additional remarks"></div></div>
-            <div>
-                <label style="font-weight:600; font-size:0.85rem;">✍️ Certificated Sr. Electrical Technician: </span></label>
-                <canvas id="signatureCanvas" width="400" height="100"></canvas>
-                <div><button id="clearSignatureBtn" class="btn btn-sm">Clear Signature</button></div>
-            </div>
-            <div style="display: flex; gap: 12px; margin-top: 16px;"><button id="previewRecordBtn" class="btn btn-primary">🔍 Preview</button><button id="saveRecordBtn" class="btn btn-primary">💾 Save Record</button><button id="clearFormBtnRecord" class="btn">🗑️ Clear</button></div>
-        </div>
-        <div style="background:#f9fbfe; border-radius:20px; padding:16px; margin-top:16px;"><h4>📌 Selected Equipment</h4><div id="selectedEquipList" style="font-size:0.7rem; max-height:120px; overflow-y:auto;"></div></div>
-    </div>
-
-    <div id="historyPage" class="page">
-        <div class="filter-bar"><input type="text" id="historySearch" placeholder="🔍 Filter"><select id="histFilterPurpose"><option value="">Job Type</option><option value="PM">PM</option><option value="CM">CM</option><option value="QA">QA</option><option value="AT">AT</option><option value="OTH">OTH</option></select><select id="histFilterStatus"><option value="">Status</option><option value="IN">IN</option><option value="OUT">OUT</option></select><select id="histFilterRecordStatus"><option value="">Record Status</option><option value="Verified">Verified</option><option value="Edited">Edited</option></select>
-        <input type="date" id="historyStartDate" style="width:130px;"><input type="date" id="historyEndDate" style="width:130px;"><span style="font-size:0.7rem; color:#666;">to</span>
-            <div style="display:flex; gap:8px; align-items:center;"><span style="font-size:0.7rem;">Sort by Date:</span><button id="sortHistoryAscBtn" class="btn btn-sm">⬆️ Ascending</button><button id="sortHistoryDescBtn" class="btn btn-sm">⬇️ Descending</button></div>
-            <button id="resetHistoryFiltersBtn" class="btn">Reset</button><button id="exportBtn" class="btn-primary btn">📎 Export</button></div>
-        <div class="table-wrapper"><table style="min-width:950px;"><thead><tr><th>Timestamp</th><th>Equipment(s) Details</th><th>Status</th><th>Job Type</th><th>Purpose</th><th>ET/SET/Phy</th><th>Record Status</th><th>Edit History</th><th>Actions</th><tr></thead><tbody id="historyBody"></tbody></table></div>
-    </div>
-
-    <div id="dblogsPage" class="page">
-        <div class="filter-bar"><input type="text" id="dbLogSearch" placeholder="🔍 Filter logs">
-    <select id="dbLogActionFilter">
-        <option value="">All Actions</option>
-        <option value="EQUIPMENT_ADDED">➕ Equipment Added</option>
-        <option value="EQUIPMENT_EDITED">🔧 Equipment Edited</option>
-        <option value="LOGIN_SUCCESS" class="admin-only-action">✅ Login Success</option>
-        <option value="LOGIN_FAILED" class="admin-only-action">❌ Login Failed</option>
-        <option value="LOGOUT" class="admin-only-action">🚪 Logout</option>
-        <option value="SESSION_START" class="admin-only-action">🔄 Session Start</option>
-        <option value="USER_CREATED" class="admin-only-action">👤 User Created</option>
-        <option value="PASSWORD_CHANGED" class="admin-only-action">🔑 Password Changed</option>
-        <option value="RECORD_CREATED" class="admin-only-action">📝 Record Created</option>
-        <option value="RECORD_EDITED" class="admin-only-action">✏️ Record Edited</option>
-        <option value="BACKUP" class="admin-only-action">💾 Backup</option>
-        <option value="RESTORE" class="admin-only-action">📂 Restore</option>
-        <option value="SUPABASE_BACKUP" class="admin-only-action">☁️ Supabase Backup</option>
-        <option value="POKE_SENT" class="admin-only-action">🔔 Poke Sent</option>
-        <option value="POKE_BACK" class="admin-only-action">🔁 Poke Back</option>
-    </select>
-    <input type="date" id="dbLogStartDate" style="width:130px;">
-    <input type="date" id="dbLogEndDate" style="width:130px;">
-    <span style="font-size:0.7rem; color:#666;">to</span>
-            <div style="display:flex; gap:8px; align-items:center;"><span style="font-size:0.7rem;">Sort by Date:</span><button id="sortDbLogsAscBtn" class="btn btn-sm">⬆️ Ascending</button><button id="sortDbLogsDescBtn" class="btn btn-sm">⬇️ Descending</button></div>
-            <button id="resetDbLogsBtn" class="btn">Reset</button><button id="exportDbLogsBtn" class="btn-primary btn">📎 Export Logs</button></div>
-        <div class="table-wrapper"><table style="min-width:900px;"><thead><tr><th>Timestamp</th><th>Action Type</th><th>Record ID</th><th>Equipment/Details</th><th>User</th><th>Action Timestamp</th><th>Reason/Note</th><tr></thead><tbody id="dbLogsBody"></tbody></table></div>
-    </div>
-</div>
 
 <!-- ============================================================ -->
 <!-- MAIN APPLICATION SCRIPT                                       -->
@@ -1456,89 +889,44 @@ document.getElementById('testPasswordInput').addEventListener('keypress', functi
 // MAIN APPLICATION - Uses config for Supabase credentials
 // ============================================================
 
-// Clean up any existing subscriptions when page loads
-window.addEventListener('beforeunload', function() {
-    if (window.pokeSubscription) {
-        try {
-            window.pokeSubscription.unsubscribe();
-        } catch(e) {
-            // Ignore
-        }
-        window.pokeSubscription = null;
-    }
-    if (window.pokePollingInterval) {
-        clearInterval(window.pokePollingInterval);
-        window.pokePollingInterval = null;
-    }
-});
-
 (function() {
-    // ============================================================
-    // GET CONFIGURATION FROM WINDOW OBJECT
-    // ============================================================
-    
-    // Try to get config from multiple sources
-    let CONFIG = window.__CONFIG__ || {};
-    
-    // If config is not available, try to get from global variables
-    if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
-        console.warn('⚠️ Configuration not available from __CONFIG__, trying global variables...');
-        
-        // Check if password protection script set global variables
-        if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
-            CONFIG = {
-                SUPABASE_URL: window.SUPABASE_URL,
-                SUPABASE_ANON_KEY: window.SUPABASE_ANON_KEY,
-                APP_NAME: 'NTWC_MPU_DRWS',
-                APP_ENV: 'production',
-                ENABLE_DEBUG: false
-            };
-            console.log('✅ Using config from global variables');
-        } else {
-            // Final fallback - try to load config directly
-            console.warn('⚠️ No config found, attempting direct fetch...');
-            fetch('config.prod.js')
-                .then(response => response.text())
-                .then(text => {
-                    // Extract the config from the JS file
-                    try {
-                        // This is a hack - we're evaluating the config
-                        // In production, you should use a proper config loading mechanism
-                        eval(text);
-                        if (window.__CONFIG__) {
-                            CONFIG = window.__CONFIG__;
-                            console.log('✅ Config loaded via direct fetch');
-                            // Re-initialize with the loaded config
-                            initializeAppWithConfig(CONFIG);
-                        }
-                    } catch(e) {
-                        console.error('❌ Failed to eval config:', e);
-                        showConfigErrorAndRetry();
-                    }
-                })
-                .catch(err => {
-                    console.error('❌ Failed to fetch config:', err);
-                    showConfigErrorAndRetry();
-                });
+    // Wait for config to be loaded
+    function waitForConfig(callback) {
+        if (window.__CONFIG__) {
+            callback();
             return;
         }
+        
+        // Check again in 100ms
+        var checkInterval = setInterval(function() {
+            if (window.__CONFIG__) {
+                clearInterval(checkInterval);
+                callback();
+            }
+        }, 100);
+        
+        // Timeout after 5 seconds
+        setTimeout(function() {
+            clearInterval(checkInterval);
+            if (!window.__CONFIG__) {
+                console.error('❌ Config load timeout');
+                alert('Configuration error. Please refresh the page.');
+            }
+        }, 5000);
     }
     
-    // Validate config
-    if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
-        console.error('❌ Configuration not available for main app');
-        showConfigErrorAndRetry();
-        return;
-    }
-    
-    // Initialize the app with the config
-    initializeAppWithConfig(CONFIG);
-    
-    function initializeAppWithConfig(CONFIG) {
+    waitForConfig(function() {
+        const CONFIG = window.__CONFIG__ || {};
+        
+        if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
+            console.error('❌ Configuration not available');
+            alert('Configuration error. Please contact administrator.');
+            return;
+        }
+        
         console.log('✅ Main app using configuration:', {
-            url: CONFIG.SUPABASE_URL ? '✓ Set' : '✗ Missing',
-            env: CONFIG.APP_ENV || 'unknown',
-            debug: CONFIG.ENABLE_DEBUG || false
+            url: CONFIG.SUPABASE_URL,
+            env: CONFIG.APP_ENV
         });
         
         // ============================================================
@@ -1546,26 +934,10 @@ window.addEventListener('beforeunload', function() {
         // ============================================================
         const supabaseUrl = CONFIG.SUPABASE_URL;
         const supabaseAnonKey = CONFIG.SUPABASE_ANON_KEY;
-        
-        // Check if supabase library is loaded
-        if (typeof window.supabase === 'undefined') {
-            console.error('❌ Supabase library not loaded. Please check your internet connection.');
-            document.body.innerHTML = `
-                <div style="text-align:center; padding:50px; color:red; font-family:sans-serif;">
-                    <h1>⚠️ Library Error</h1>
-                    <p>Supabase library failed to load. Please check your internet connection.</p>
-                    <button onclick="location.reload()" style="margin-top:20px; padding:10px 30px; background:#166b5c; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px;">
-                        🔄 Retry
-                    </button>
-                </div>
-            `;
-            return;
-        }
-        
         const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
         
         // Make supabaseClient globally available
-        window.supabaseClient = supabaseClient;  
+        window.supabaseClient = supabaseClient;
     
     let currentUser = null, currentUserRole = null;
     let equipmentData = [], equipStatus = {}, historyRecords = [], dbLogs = [];
@@ -7441,23 +6813,8 @@ window.addEventListener('beforeunload', function() {
     if (savedUser) { login(savedUser, ""); } else { document.getElementById("loginPage").style.display = "flex"; document.getElementById("appContainer").classList.remove("visible"); document.getElementById("aiAssistant").style.display = "none"; }
     document.getElementById("loginBtn").onclick = async () => { const username = document.getElementById("loginUsername").value.trim().toLowerCase(); const password = document.getElementById("loginPassword").value; await login(username, password); };
 
-		console.log('✅ Main app initialized successfully');
-    }
-    
-    function showConfigErrorAndRetry() {
-        document.body.innerHTML = `
-            <div style="text-align:center; padding:50px; color:red; font-family:sans-serif;">
-                <h1>⚠️ Configuration Error</h1>
-                <p>Unable to load configuration. Please check your setup.</p>
-                <p style="font-size:12px; color:#666; margin-top:10px;">
-                    Missing Supabase credentials
-                </p>
-                <button onclick="location.reload()" style="margin-top:20px; padding:10px 30px; background:#166b5c; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px;">
-                    🔄 Retry
-                </button>
-            </div>
-        `;
-    }		
+	console.log('✅ Main app initialized successfully');
+	});
 })();
 </script>
 </body>
