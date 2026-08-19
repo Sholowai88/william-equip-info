@@ -3921,45 +3921,139 @@
 	    renderStatsWithDateFilter();
 	}
     
-    const canvas = document.getElementById("signatureCanvas"), ctx = canvas.getContext("2d"); let drawing = false;
-    function initCanvas() { 
-	    canvas.width = 400; 
-	    canvas.height = 100; 
-	    ctx.fillStyle = "white"; 
-	    ctx.fillRect(0, 0, canvas.width, canvas.height); 
-	    ctx.strokeStyle = "#166b5c"; 
-	    ctx.lineWidth = 2;
+    // ============================================================
+	// SIGNATURE CANVAS - COMPLETE WORKING VERSION
+	// ============================================================
+	
+	let signatureCanvas = null;
+	let signatureCtx = null;
+	let isDrawing = false;
+	
+	function getCanvasCoordinates(e) {
+	    if (!signatureCanvas) return { x: 0, y: 0 };
+	    const rect = signatureCanvas.getBoundingClientRect();
+	    const scaleX = signatureCanvas.width / rect.width;
+	    const scaleY = signatureCanvas.height / rect.height;
+	    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+	    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+	    return {
+	        x: (clientX - rect.left) * scaleX,
+	        y: (clientY - rect.top) * scaleY
+	    };
+	}
+	
+	function startDrawing(e) {
+	    if (!signatureCtx) return;
+	    isDrawing = true;
+	    const { x, y } = getCanvasCoordinates(e);
+	    signatureCtx.beginPath();
+	    signatureCtx.moveTo(x, y);
+	    e.preventDefault();
+	}
+	
+	function drawStroke(e) {
+	    if (!isDrawing || !signatureCtx) return;
+	    const { x, y } = getCanvasCoordinates(e);
+	    signatureCtx.lineTo(x, y);
+	    signatureCtx.stroke();
+	    signatureCtx.beginPath();
+	    signatureCtx.moveTo(x, y);
+	    e.preventDefault();
+	}
+	
+	function stopDrawing() {
+	    isDrawing = false;
+	    if (signatureCtx) signatureCtx.beginPath();
+	}
+	
+	function drawDefaultSignature() {
+	    if (!signatureCtx || !signatureCanvas) return;
+	    signatureCtx.fillStyle = "#166b5c";
+	    signatureCtx.font = "bold 28px 'Segoe UI', 'Brush Script MT', cursive";
+	    signatureCtx.textAlign = "center";
+	    signatureCtx.textBaseline = "middle";
+	    signatureCtx.fillText("Reeve WOO", signatureCanvas.width / 2, signatureCanvas.height / 2);
 	    
-	    // Auto-draw "Reeve WOO" on the canvas
-	    drawSignatureName();
+	    signatureCtx.strokeStyle = "#166b5c";
+	    signatureCtx.lineWidth = 2;
+	    signatureCtx.beginPath();
+	    signatureCtx.moveTo(signatureCanvas.width / 2 - 80, signatureCanvas.height / 2 + 25);
+	    signatureCtx.lineTo(signatureCanvas.width / 2 + 80, signatureCanvas.height / 2 + 25);
+	    signatureCtx.stroke();
 	}
-	function drawSignatureName() {
-	    ctx.fillStyle = "#166b5c";
-	    ctx.font = "bold 28px 'Segoe UI', 'Brush Script MT', cursive";
-	    ctx.textAlign = "center";
-	    ctx.textBaseline = "middle";
-	    ctx.fillText("Reeve WOO", canvas.width / 2, canvas.height / 2);
+	
+	function initSignatureCanvas() {
+	    // Find the canvas
+	    signatureCanvas = document.getElementById("signatureCanvas");
 	    
-	    // Add a subtle underline
-	    ctx.strokeStyle = "#166b5c";
-	    ctx.lineWidth = 2;
-	    ctx.beginPath();
-	    ctx.moveTo(canvas.width / 2 - 80, canvas.height / 2 + 25);
-	    ctx.lineTo(canvas.width / 2 + 80, canvas.height / 2 + 25);
-	    ctx.stroke();
+	    if (!signatureCanvas) {
+	        console.warn("⚠️ Signature canvas not found, retrying...");
+	        setTimeout(initSignatureCanvas, 300);
+	        return;
+	    }
+	    
+	    // Get context
+	    signatureCtx = signatureCanvas.getContext("2d");
+	    
+	    // Set size
+	    signatureCanvas.width = 400;
+	    signatureCanvas.height = 100;
+	    
+	    // Clear and draw default
+	    signatureCtx.fillStyle = "white";
+	    signatureCtx.fillRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+	    signatureCtx.strokeStyle = "#166b5c";
+	    signatureCtx.lineWidth = 2;
+	    
+	    drawDefaultSignature();
+	    
+	    // Remove old event listeners (to prevent duplicates)
+	    signatureCanvas.removeEventListener("mousedown", startDrawing);
+	    signatureCanvas.removeEventListener("mousemove", drawStroke);
+	    signatureCanvas.removeEventListener("mouseup", stopDrawing);
+	    signatureCanvas.removeEventListener("touchstart", startDrawing);
+	    signatureCanvas.removeEventListener("touchmove", drawStroke);
+	    signatureCanvas.removeEventListener("touchend", stopDrawing);
+	    
+	    // Add event listeners
+	    signatureCanvas.addEventListener("mousedown", startDrawing);
+	    signatureCanvas.addEventListener("mousemove", drawStroke);
+	    signatureCanvas.addEventListener("mouseup", stopDrawing);
+	    signatureCanvas.addEventListener("touchstart", startDrawing);
+	    signatureCanvas.addEventListener("touchmove", drawStroke);
+	    signatureCanvas.addEventListener("touchend", stopDrawing);
+	    
+	    console.log("✅ Signature canvas ready");
 	}
-	function clearCanvas() { 
-	    ctx.fillStyle = "white"; 
-	    ctx.fillRect(0, 0, canvas.width, canvas.height);
-	    // Redraw the signature name after clearing
-	    drawSignatureName();
+	
+	function clearSignature() {
+	    if (!signatureCtx || !signatureCanvas) return;
+	    signatureCtx.fillStyle = "white";
+	    signatureCtx.fillRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+	    drawDefaultSignature();
 	}
-	function getXY(e) { let rect = canvas.getBoundingClientRect(), sx = canvas.width / rect.width, sy = canvas.height / rect.height; let cx = (e.touches ? e.touches[0].clientX : e.clientX), cy = (e.touches ? e.touches[0].clientY : e.clientY); return { x: (cx - rect.left) * sx, y: (cy - rect.top) * sy }; }
-    function startDraw(e) { drawing = true; let { x, y } = getXY(e); ctx.beginPath(); ctx.moveTo(x, y); e.preventDefault(); }
-    function drawMove(e) { if (!drawing) return; let { x, y } = getXY(e); ctx.lineTo(x, y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y); e.preventDefault(); }
-    function endDraw() { drawing = false; ctx.beginPath(); }
-    canvas.addEventListener("mousedown", startDraw); canvas.addEventListener("mousemove", drawMove); canvas.addEventListener("mouseup", endDraw); canvas.addEventListener("touchstart", startDraw); canvas.addEventListener("touchmove", drawMove); canvas.addEventListener("touchend", endDraw);
-    
+	
+	// Initialize on page load
+	if (document.readyState === 'complete' || document.readyState === 'interactive') {
+	    setTimeout(initSignatureCanvas, 100);
+	} else {
+	    document.addEventListener('DOMContentLoaded', function() {
+	        setTimeout(initSignatureCanvas, 200);
+	    });
+	}
+	
+	// Re-initialize when "In/Out Record" tab is shown
+	document.addEventListener('click', function(e) {
+	    var tab = e.target.closest ? e.target.closest('.tab') : null;
+	    if (tab && tab.dataset && tab.dataset.page === 'record') {
+	        setTimeout(initSignatureCanvas, 200);
+	    }
+	});
+	
+	// Make available globally
+	window.clearSignature = clearSignature;
+	window.initSignatureCanvas = initSignatureCanvas;
+		
     function validateStatusSelection() {
         let selected = equipmentData.filter(eq => selectedAssetsSet.has(getKey(eq)));
         let desiredStatus = document.getElementById("inOutStatus").value;
