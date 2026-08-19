@@ -273,9 +273,225 @@
 	                createPasswordOverlay();
 	            }
 	        }
+
+			function createPasswordOverlay() {
+		    // Add overlay styles
+		    var overlayStyles = document.createElement('style');
+		    overlayStyles.textContent = `
+		        /* Password Overlay - Full screen with blur effect */
+		        #passwordOverlay {
+		            position: fixed;
+		            top: 0;
+		            left: 0;
+		            width: 100%;
+		            height: 100%;
+		            background: rgba(0, 0, 0, 0.75);
+		            backdrop-filter: blur(15px);
+		            -webkit-backdrop-filter: blur(15px);
+		            display: flex;
+		            align-items: center;
+		            justify-content: center;
+		            z-index: 999999;
+		            font-family: 'Segoe UI', sans-serif;
+		            animation: fadeInOverlay 0.5s ease;
+		        }
+		        @keyframes fadeInOverlay {
+		            from { opacity: 0; }
+		            to { opacity: 1; }
+		        }
+		        #passwordOverlay .auth-card {
+		            background: white;
+		            padding: 45px 40px 40px 40px;
+		            border-radius: 28px;
+		            max-width: 420px;
+		            width: 90%;
+		            text-align: center;
+		            box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+		            animation: slideUp 0.5s ease;
+		            position: relative;
+		            overflow: hidden;
+		        }
+		        #passwordOverlay .auth-card::before {
+		            content: '';
+		            position: absolute;
+		            top: 0;
+		            left: 0;
+		            right: 0;
+		            height: 4px;
+		            background: linear-gradient(90deg, #0a2e3f, #1a5c6e, #0a2e3f);
+		        }
+		        @keyframes slideUp {
+		            from { transform: translateY(30px); opacity: 0; }
+		            to { transform: translateY(0); opacity: 1; }
+		        }
+		        #passwordOverlay .auth-icon {
+		            font-size: 56px;
+		            margin-bottom: 16px;
+		            display: block;
+		        }
+		        #passwordOverlay .auth-title {
+		            color: #0a2e3f;
+		            font-size: 22px;
+		            margin-bottom: 6px;
+		            font-weight: 700;
+		        }
+		        #passwordOverlay .auth-subtitle {
+		            color: #666;
+		            font-size: 14px;
+		            margin-bottom: 25px;
+		            line-height: 1.5;
+		        }
+		        #passwordOverlay .auth-input {
+		            width: 100%;
+		            padding: 14px 18px;
+		            border: 2px solid #e2e8f0;
+		            border-radius: 14px;
+		            font-size: 16px;
+		            margin-bottom: 15px;
+		            box-sizing: border-box;
+		            transition: all 0.3s;
+		            background: #f8fafc;
+		        }
+		        #passwordOverlay .auth-input:focus {
+		            outline: none;
+		            border-color: #1a5c6e;
+		            box-shadow: 0 0 0 4px rgba(26,92,110,0.1);
+		            background: white;
+		        }
+		        #passwordOverlay .auth-btn {
+		            width: 100%;
+		            padding: 14px;
+		            background: linear-gradient(135deg, #0a2e3f, #1a5c6e);
+		            color: white;
+		            border: none;
+		            border-radius: 14px;
+		            font-size: 16px;
+		            cursor: pointer;
+		            font-weight: 600;
+		            transition: all 0.3s;
+		            letter-spacing: 0.5px;
+		        }
+		        #passwordOverlay .auth-btn:hover {
+		            transform: translateY(-2px);
+		            box-shadow: 0 8px 30px rgba(26,92,110,0.35);
+		        }
+		        #passwordOverlay .auth-btn:active {
+		            transform: scale(0.97);
+		        }
+		        #passwordOverlay .auth-btn:disabled {
+		            opacity: 0.7;
+		            cursor: not-allowed;
+		            transform: none;
+		        }
+		        #passwordOverlay .auth-error {
+		            color: #dc3545;
+		            font-size: 13px;
+		            margin-top: 12px;
+		            display: none;
+		            padding: 8px 12px;
+		            background: #ffe0db;
+		            border-radius: 8px;
+		        }
+		        #passwordOverlay .auth-error.show {
+		            display: block;
+		            animation: shake 0.5s ease;
+		        }
+		        @keyframes shake {
+		            0%, 100% { transform: translateX(0); }
+		            20% { transform: translateX(-10px); }
+		            40% { transform: translateX(10px); }
+		            60% { transform: translateX(-6px); }
+		            80% { transform: translateX(6px); }
+		        }
+		        #passwordOverlay .auth-hint {
+		            font-size: 12px;
+		            color: #999;
+		            margin-top: 15px;
+		        }
+		        #passwordOverlay .auth-footer {
+		            margin-top: 18px;
+		            padding-top: 14px;
+		            border-top: 1px solid #eee;
+		            font-size: 11px;
+		            color: #bbb;
+		        }
+		        #passwordOverlay .auth-security {
+		            margin-top: 10px;
+		            font-size: 11px;
+		            color: #2ecc71;
+		            background: #eafaf1;
+		            padding: 4px 12px;
+		            border-radius: 20px;
+		            display: inline-block;
+		        }
+		        /* Prevent scrolling while overlay is active */
+		        body.no-scroll {
+		            overflow: hidden !important;
+		        }
+		        /* Blur the background content */
+		        .page-blur {
+		            filter: blur(8px) !important;
+		            -webkit-filter: blur(8px) !important;
+		            pointer-events: none !important;
+		            user-select: none !important;
+		        }
+		    `;
+		    document.head.appendChild(overlayStyles);
+		    
+		    // Add no-scroll class to body
+		    document.body.classList.add('no-scroll');
+		    
+		    // Blur all main content elements
+		    var elementsToBlur = [
+		        document.getElementById('appContainer'),
+		        document.getElementById('loginPage'),
+		        document.getElementById('aiAssistant'),
+		        document.getElementById('aiChatWindow'),
+		        document.getElementById('liveTime'),
+		        document.getElementById('liveDate')
+		    ];
+		    
+		    elementsToBlur.forEach(function(el) {
+		        if (el) {
+		            el.classList.add('page-blur');
+		        }
+		    });
+		    
+		    // Also blur any visible content
+		    var allContent = document.querySelectorAll('.app-container, .login-container, .ai-assistant, .ai-chat-window, .header, .tabs, .page, .filter-bar, .digital-clock');
+		    allContent.forEach(function(el) {
+		        if (el) {
+		            el.classList.add('page-blur');
+		        }
+		    });
+		    
+		    // Create the overlay
+		    var overlay = document.createElement('div');
+		    overlay.id = 'passwordOverlay';
+		    overlay.innerHTML = `
+		        <div class="auth-card">
+		            <span class="auth-icon">🔬⚡</span>
+		            <h2 class="auth-title">Equipment Database</h2>
+		            <p class="auth-subtitle">This page is password protected.<br>Please enter the password to continue.</p>
+		            <input type="password" class="auth-input" id="authPassword" placeholder="Enter password..." autocomplete="off" autofocus>
+		            <button class="auth-btn" onclick="window.checkAuthPassword()">🔓 Unlock</button>
+		            <div class="auth-error" id="authError">❌ Incorrect password. Please try again.</div>
+		            <div class="auth-security">🔐 Password stored securely (SHA-256)</div>
+		            <div class="auth-hint">🔒 Session expires when you close the browser</div>
+		            <div class="auth-footer">Protected with Supabase Security</div>
+		        </div>
+		    `;
+		    document.body.appendChild(overlay);
+		    
+		    // Focus on input after a delay
+		    setTimeout(function() {
+		        var input = document.getElementById('authPassword');
+		        if (input) {
+		            input.focus();
+		        }
+		    }, 300);
+		}
 	        
-	        function createPasswordOverlay() {
-	            // ... (keep your existing overlay code) ...
 	        }
 	        
 	        window.verifyPasswordWithSupabase = verifyPasswordWithSupabase;
@@ -4082,10 +4298,14 @@
         	return; 
     	}
     
-    	if (canvas.toDataURL() === document.createElement('canvas').toDataURL()) { 
-        	alert("Signature required"); 
-        	return; 
-    	}
+    	if (!signatureCanvas) {
+		    alert("Signature canvas not available. Please refresh and try again.");
+		    return;
+		}
+		if (signatureCanvas.toDataURL() === document.createElement('canvas').toDataURL()) { 
+		    alert("Signature required"); 
+		    return; 
+		}
     
     	var et = [...document.getElementById("etSelect").selectedOptions].map(function(o) { return o.value; }).join(", ");
     	var set = document.getElementById("setSelect").value;
@@ -4093,7 +4313,7 @@
     	var others = document.getElementById("othersNames").value.trim();
     	var remarks = document.getElementById("remarksField").value.trim();
     	// Get the signature from canvas and overlay the name if needed
-		var signature = canvas.toDataURL();
+		var signature = signatureCanvas.toDataURL();
     	var selectedEquips = equipmentData.filter(function(eq) { return selectedAssetsSet.has(getKey(eq)); });
     	var equipDetails = selectedEquips.map(function(eq) { 
         	return { 
@@ -6009,7 +6229,7 @@
 		    }, 500);
 		}
 		
-        updateClock(); setToday(); initCanvas();
+        updateClock(); setToday(); initSignatureCanvas();
 
 		// Hide admin-only actions in DB Logs filter for Senior Super-user
 		if (currentUserRole === 'senior_super') {
@@ -6063,7 +6283,7 @@
         document.getElementById("todayBtn").onclick = setToday;
         document.getElementById("saveRecordBtn").onclick = saveRecord;
         document.getElementById("clearFormBtnRecord").onclick = () => { document.getElementById("jobType").value = ""; document.getElementById("purposeInput").value = ""; document.getElementById("othersNames").value = ""; document.getElementById("remarksField").value = ""; Array.from(document.getElementById("etSelect").options).forEach(o => o.selected = false); document.getElementById("setSelect").selectedIndex = 0; document.getElementById("phySelect").selectedIndex = 0; clearCanvas(); setToday(); };
-        document.getElementById("clearSignatureBtn").onclick = clearCanvas;
+        document.getElementById("clearSignatureBtn").onclick = clearSignature;
         document.getElementById("previewRecordBtn").onclick = () => {
 		    let selected = equipmentData.filter(eq => selectedAssetsSet.has(getKey(eq)));
 		    if (selected.length === 0) { alert("No equipment selected."); return; }
@@ -6074,7 +6294,7 @@
 		            <div><strong>Job Type:</strong><br>${document.getElementById("jobType").value}</div><div><strong>Purpose:</strong><br>${document.getElementById("purposeInput").value}</div>
 		            <div><strong>ET/SET/Phy:</strong><br>${[...document.getElementById("etSelect").selectedOptions].map(o => o.value).join(',')}/${document.getElementById("setSelect").value}/${document.getElementById("phySelect").value}</div>
 		            <div><strong>Remarks:</strong><br>${document.getElementById("remarksField").value}</div>
-		            <div style="grid-column:span 2;"><strong>Certificated Sr. Electrical Technician:</strong><br><img src="${canvas.toDataURL()}" style="max-width:100%; max-height:100px; border:1px solid #ddd; border-radius:8px; margin-top:8px;"><br></span></div>
+		            <div style="grid-column:span 2;"><strong>Certificated Sr. Electrical Technician:</strong><br><img src="${signatureCanvas ? signatureCanvas.toDataURL() : ''}" style="max-width:100%; max-height:100px; border:1px solid #ddd; border-radius:8px; margin-top:8px;"><br></span></div>
 		        </div></div>
 		        <h4>Selected Equipment (${selected.length})</h4><ul style="max-height:200px; overflow-y:auto; background:#f8fafc; padding:12px; border-radius:8px;">${selected.map(e => `<li><strong>${e.assetNumber || e.assetDesc}</strong> - ${e.assetDesc}</li>`).join('')}</ul>
 		    </div>`;
