@@ -1,10 +1,19 @@
+// config.prod.js
 // ============================================================
-// PRODUCTION CONFIG - Manual creation for testing
+// PRODUCTION CONFIG - Placeholder for GitHub Actions
+// ============================================================
+// This file is replaced by GitHub Actions during deployment.
+// The real credentials come from GitHub Secrets.
 // ============================================================
 
+// This is a placeholder - GitHub Actions will generate the real file
+console.log('⚠️ Production config placeholder - waiting for GitHub Actions deployment');
+
+// Try to load from environment or use fallback
 const CONFIG = {
-    SUPABASE_URL: 'https://qhuqlhzvpmhykkmmqtth.supabase.co',
-    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFodXFsaHp2cG1oeWtrbW1xdHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMTM0OTQsImV4cCI6MjA5Njc4OTQ5NH0.pTTY4irj4vx-us8W1DyYaEB6ug_wEjuwNdy0lJjh_-8',
+    // These will be replaced by GitHub Actions
+    SUPABASE_URL: '',
+    SUPABASE_ANON_KEY: '',
     APP_NAME: 'NTWC_MPU_DRWS',
     APP_VERSION: '2.0',
     APP_ENV: 'production',
@@ -20,6 +29,3 @@ if (typeof window !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = CONFIG;
 }
-
-console.log('✅ Production config loaded successfully');
-console.log('📊 Environment:', CONFIG.APP_ENV);
